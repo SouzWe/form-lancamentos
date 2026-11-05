@@ -66,26 +66,55 @@ const val = id => ($("#" + id)?.value || "").trim();
 const CAMPO = (id, rotulo, tipoInput = "text", extra = "") =>
   `<label for="${id}">${rotulo}</label><input id="${id}" type="${tipoInput}" ${extra}>`;
 
+// Lista de produtos vem no link do botão: #p=<base64 de [[id, nome, unidade, preço], ...]>. Sem ela, campo livre.
+const LISTA = (() => {
+  try {
+    const b = (new URLSearchParams(location.hash.slice(1)).get("p") || "").replace(/-/g, "+").replace(/_/g, "/");
+    if (!b) return [];
+    const bytes = Uint8Array.from(atob(b + "=".repeat((4 - b.length % 4) % 4)), c => c.charCodeAt(0));
+    return JSON.parse(new TextDecoder().decode(bytes));
+  } catch (e) { return []; }
+})();
+const OUTRO = "__outro";
+
+function campoProduto() {
+  if (!LISTA.length) return `<input placeholder="Produto" data-k="nome">`;
+  const ops = LISTA.map((p, i) => `<option value="${i}">${p[1]}${p[2] ? " (" + p[2] + ")" : ""}</option>`).join("");
+  return `<select data-k="sel"><option value="">Produto…</option>${ops}<option value="${OUTRO}">✏️ Outro (escrever)</option></select>`;
+}
+
 function linhaProduto() {
   const div = document.createElement("div");
   if (tipo === "venda") {
     div.className = "linha venda";
-    div.innerHTML = `<input placeholder="Produto" data-k="nome"><input placeholder="Qtd" inputmode="decimal" data-k="qtd">
+    div.innerHTML = `${campoProduto()}<input placeholder="Qtd" inputmode="decimal" data-k="qtd">
       <input placeholder="Preço" inputmode="decimal" data-k="preco"><button type="button" class="tirar" aria-label="Tirar">×</button>`;
   } else {
     div.className = "linha talao";
-    div.innerHTML = `<input placeholder="Produto" data-k="nome"><input placeholder="Valor R$" inputmode="decimal" data-k="valor">
+    div.innerHTML = `${campoProduto()}<input placeholder="Valor R$" inputmode="decimal" data-k="valor">
       <button type="button" class="tirar" aria-label="Tirar">×</button>`;
   }
   div.querySelector(".tirar").onclick = () => { div.remove(); somar(); };
   div.querySelectorAll("input").forEach(i => i.oninput = somar);
+  const sel = div.querySelector("[data-k=sel]");
+  if (sel) sel.onchange = () => {
+    if (sel.value === OUTRO) {   // troca a lista por campo livre nesta linha
+      const inp = document.createElement("input");
+      inp.placeholder = "Produto"; inp.dataset.k = "nome"; inp.oninput = somar;
+      sel.replaceWith(inp); inp.focus(); return;
+    }
+    const p = LISTA[sel.value], preco = div.querySelector("[data-k=preco]");
+    if (p && preco) { preco.value = String(p[3]).replace(".", ","); const q = div.querySelector("[data-k=qtd]"); if (!q.value) q.value = "1"; }
+    somar();
+  };
   $("#produtos").appendChild(div);
 }
 
 function produtos() {
   return [...document.querySelectorAll("#produtos .linha")].map(l => {
     const g = k => (l.querySelector(`[data-k=${k}]`)?.value || "").trim();
-    return { nome: g("nome"), qtd: g("qtd"), preco: g("preco"), valor: g("valor") };
+    const p = LISTA[g("sel")];
+    return { nome: p ? `${p[1]} (${p[0]})` : g("nome"), qtd: g("qtd"), preco: g("preco"), valor: g("valor") };
   }).filter(p => p.nome || p.qtd || p.preco || p.valor);
 }
 
