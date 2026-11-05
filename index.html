@@ -70,17 +70,23 @@ const tipo = TIPOS.includes(new URLSearchParams(location.search).get("tipo")) ? 
 const $ = s => document.querySelector(s);
 const form = $("#form");
 
-// Listas vêm no link do botão (depois do #): p = produtos [id, nome, unidade, preço], c = clientes [id, nome, bairro],
-// r = bairros [nome]. Tudo em base64 (url-safe) de JSON. Sem elas, os campos ficam livres.
-function lerLista(k) {
+// Listas vêm no link do botão (depois do #, não chega a servidor nenhum): z = JSON compactado (deflate puro,
+// base64 url-safe) com p = produtos [id, nome, unidade, preço], c = clientes [id, nome, bairro], r = bairros [nome].
+// Sem listas, os campos ficam livres.
+let PRODUTOS = [], CLIENTES = [], BAIRROS = [];
+async function carregarListas() {
   try {
-    const b = (new URLSearchParams(location.hash.slice(1)).get(k) || "").replace(/-/g, "+").replace(/_/g, "/");
-    if (!b) return [];
+    const b = (new URLSearchParams(location.hash.slice(1)).get("z") || "").replace(/-/g, "+").replace(/_/g, "/");
+    if (!b) return;
     const bytes = Uint8Array.from(atob(b + "=".repeat((4 - b.length % 4) % 4)), c => c.charCodeAt(0));
-    return JSON.parse(new TextDecoder().decode(bytes));
-  } catch (e) { return []; }
+    const fluxo = new Blob([bytes]).stream().pipeThrough(new DecompressionStream("deflate-raw"));
+    const d = JSON.parse(await new Response(fluxo).text());
+    PRODUTOS = d.p || []; CLIENTES = d.c || []; BAIRROS = d.r || [];
+  } catch (e) { /* sem listas: campos livres */ }
 }
-const PRODUTOS = lerLista("p"), CLIENTES = lerLista("c"), BAIRROS = lerLista("r");
+
+carregarListas().then(montar);
+function montar() {
 const OUTRO = "__outro";
 
 const hojeISO = () => { const d = new Date(); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); return d.toISOString().slice(0, 10); };
@@ -313,6 +319,7 @@ $("#enviar").onclick = () => {
 };
 
 if (tg) { tg.ready(); tg.expand(); }
+}
 </script>
 </body>
 </html>
