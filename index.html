@@ -257,7 +257,7 @@ if (tipo === "venda") {
   });
 }
 $("#add").onclick = linhaProduto;
-if (tipo !== "cliente") linhaProduto();
+linhaProduto();   // linha vazia é ignorada no envio (primeira compra do cliente novo é opcional)
 ligarBusca(); ligarCadastro();
 
 // ---------- texto enviado ao bot ----------
