@@ -45,7 +45,7 @@
           border-radius: 12px; margin-bottom: 14px; }
   .abas button { border: 0; padding: 10px; border-radius: 9px; background: none; color: var(--txt); font: inherit; }
   .abas button.on { background: var(--btn); color: var(--btn-txt); }
-  .achados { margin-top: 4px; border-radius: 10px; overflow: hidden; }
+  .achados { margin-top: 4px; border-radius: 10px; overflow-y: auto; max-height: 280px; }
   .achados button { display: block; width: 100%; text-align: left; padding: 10px 12px; border: 0;
                     border-top: 1px solid var(--bg); background: var(--campo); color: var(--txt); font: inherit; }
   .achados small, .escolhido small { color: var(--dica); }
@@ -97,18 +97,23 @@ const CAMPO = (id, rotulo, tipoInput = "text", extra = "") =>
 // ---------- cliente já cadastrado: busca por nome ----------
 let clienteEscolhido = null;
 const BUSCA_CLIENTE = `<label for="busca">Cliente</label><div id="caixa-cliente">
-  <input id="busca" placeholder="${CLIENTES.length ? "Digite parte do nome…" : "Nome do cliente"}"><div class="achados" id="achados"></div></div>`;
+  <input id="busca" placeholder="${CLIENTES.length ? "Toque para ver a lista ou digite o nome…" : "Nome do cliente"}"><div class="achados" id="achados"></div></div>`;
 
 function ligarBusca() {
   const busca = $("#busca"), achados = $("#achados");
   if (!busca || !CLIENTES.length) return;
-  busca.oninput = () => {
+  // Tocar mostra todos (como a lista de produtos); digitar filtra — quem começa com o texto vem primeiro.
+  const mostrar = () => {
     const t = sem(busca.value.trim());
-    achados.innerHTML = !t ? "" : CLIENTES.filter(c => sem(c[1]).includes(t)).slice(0, 8)
+    const lista = !t ? CLIENTES : CLIENTES.filter(c => sem(c[1]).includes(t))
+      .sort((a, b) => sem(b[1]).startsWith(t) - sem(a[1]).startsWith(t));
+    achados.innerHTML = lista
       .map(c => `<button type="button" data-id="${esc(c[0])}">${esc(c[1])} <small>${esc(c[2] || "sem bairro")}</small></button>`).join("")
       || `<button type="button" disabled><small>Ninguém com esse nome</small></button>`;
     achados.querySelectorAll("[data-id]").forEach(b => b.onclick = () => escolherCliente(CLIENTES.find(c => c[0] === b.dataset.id)));
   };
+  busca.oninput = mostrar;
+  busca.onfocus = mostrar;
 }
 function escolherCliente(c) {
   clienteEscolhido = c;
@@ -116,7 +121,7 @@ function escolherCliente(c) {
     <button type="button" aria-label="Trocar">×</button></div>`;
   $("#caixa-cliente button").onclick = () => {
     clienteEscolhido = null;
-    $("#caixa-cliente").innerHTML = `<input id="busca" placeholder="Digite parte do nome…"><div class="achados" id="achados"></div>`;
+    $("#caixa-cliente").innerHTML = `<input id="busca" placeholder="Toque para ver a lista ou digite o nome…"><div class="achados" id="achados"></div>`;
     ligarBusca(); $("#busca").focus();
   };
 }
