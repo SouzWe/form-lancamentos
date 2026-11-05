@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>Lançamento</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+  :root {
+    --bg: var(--tg-theme-bg-color, #ffffff);
+    --txt: var(--tg-theme-text-color, #1b1b1b);
+    --dica: var(--tg-theme-hint-color, #7a7a7a);
+    --campo: var(--tg-theme-secondary-bg-color, #f2f2f5);
+    --btn: var(--tg-theme-button-color, #2a7de1);
+    --btn-txt: var(--tg-theme-button-text-color, #ffffff);
+    --erro: #d64545;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; padding: 16px 16px 96px; background: var(--bg); color: var(--txt);
+         font: 16px/1.4 -apple-system, "Segoe UI", Roboto, sans-serif; }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  .sub { color: var(--dica); font-size: 14px; margin: 0 0 16px; }
+  fieldset { border: 0; padding: 0; margin: 0 0 18px; }
+  legend { font-weight: 600; font-size: 14px; text-transform: uppercase; letter-spacing: .03em;
+           color: var(--dica); margin-bottom: 8px; padding: 0; }
+  label { display: block; font-size: 14px; margin: 10px 0 4px; }
+  input, select, textarea { width: 100%; padding: 11px 12px; border: 1px solid transparent; border-radius: 10px;
+         background: var(--campo); color: var(--txt); font: inherit; }
+  input:focus, select:focus, textarea:focus { outline: none; border-color: var(--btn); }
+  textarea { min-height: 64px; resize: vertical; }
+  .linha { display: grid; gap: 8px; align-items: end; margin-bottom: 8px; }
+  .linha.venda { grid-template-columns: 1fr 64px 92px 36px; }
+  .linha.talao { grid-template-columns: 1fr 104px 36px; }
+  .linha input { padding: 10px; }
+  .tirar { height: 42px; border: 0; border-radius: 10px; background: var(--campo); color: var(--erro); font-size: 20px; }
+  .add { width: 100%; padding: 10px; border: 1px dashed var(--dica); border-radius: 10px; background: none;
+         color: var(--btn); font: inherit; }
+  .dupla { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .total { text-align: right; font-weight: 600; margin-top: 8px; }
+  .enviar { position: fixed; left: 16px; right: 16px; bottom: 16px; padding: 14px; border: 0; border-radius: 12px;
+            background: var(--btn); color: var(--btn-txt); font: 600 17px/1 inherit; }
+  .aviso { color: var(--erro); font-size: 14px; min-height: 20px; }
+  pre { white-space: pre-wrap; background: var(--campo); padding: 12px; border-radius: 10px; font-size: 13px; }
+</style>
+</head>
+<body>
+<h1 id="titulo"></h1>
+<p class="sub">Preencha o que tiver. Campo em branco pode. Nada é gravado antes da sua confirmação no chat.</p>
+<form id="form" autocomplete="off"></form>
+<p class="aviso" id="aviso"></p>
+<pre id="saida" hidden></pre>
+<button class="enviar" id="enviar" type="button">Enviar</button>
+
+<script>
+const tg = window.Telegram && Telegram.WebApp;
+const tipo = new URLSearchParams(location.search).get("tipo") === "divida" ? "divida" : "venda";
+const $ = s => document.querySelector(s);
+const form = $("#form");
+
+const hojeISO = () => { const d = new Date(); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); return d.toISOString().slice(0, 10); };
+const br = iso => iso ? iso.split("-").reverse().join("/") : "";
+const reais = n => "R$ " + n.toFixed(2).replace(".", ",");
+const num = v => { const n = parseFloat(String(v || "").replace(/\./g, "").replace(",", ".")); return isNaN(n) ? 0 : n; };
+const val = id => ($("#" + id)?.value || "").trim();
+
+const CAMPO = (id, rotulo, tipoInput = "text", extra = "") =>
+  `<label for="${id}">${rotulo}</label><input id="${id}" type="${tipoInput}" ${extra}>`;
+
+function linhaProduto() {
+  const div = document.createElement("div");
+  if (tipo === "venda") {
+    div.className = "linha venda";
+    div.innerHTML = `<input placeholder="Produto" data-k="nome"><input placeholder="Qtd" inputmode="decimal" data-k="qtd">
+      <input placeholder="Preço" inputmode="decimal" data-k="preco"><button type="button" class="tirar" aria-label="Tirar">×</button>`;
+  } else {
+    div.className = "linha talao";
+    div.innerHTML = `<input placeholder="Produto" data-k="nome"><input placeholder="Valor R$" inputmode="decimal" data-k="valor">
+      <button type="button" class="tirar" aria-label="Tirar">×</button>`;
+  }
+  div.querySelector(".tirar").onclick = () => { div.remove(); somar(); };
+  div.querySelectorAll("input").forEach(i => i.oninput = somar);
+  $("#produtos").appendChild(div);
+}
+
+function produtos() {
+  return [...document.querySelectorAll("#produtos .linha")].map(l => {
+    const g = k => (l.querySelector(`[data-k=${k}]`)?.value || "").trim();
+    return { nome: g("nome"), qtd: g("qtd"), preco: g("preco"), valor: g("valor") };
+  }).filter(p => p.nome || p.qtd || p.preco || p.valor);
+}
+
+function somar() {
+  const t = produtos().reduce((s, p) => s + (tipo === "venda" ? num(p.qtd || 1) * num(p.preco) : num(p.valor)), 0);
+  $("#total").textContent = t > 0 ? "Total: " + reais(t) : "";
+}
+
+if (tipo === "venda") {
+  $("#titulo").textContent = "🛒 Venda nova";
+  form.innerHTML = `
+    <fieldset><legend>Cliente</legend>
+      ${CAMPO("data", "Data da venda", "date", `value="${hojeISO()}"`)}
+      ${CAMPO("nome", "Nome")}
+      ${CAMPO("endereco", "Endereço ou referência")}
+      ${CAMPO("bairro", "Bairro")}
+    </fieldset>
+    <fieldset><legend>Produtos</legend><div id="produtos"></div>
+      <button type="button" class="add" id="add">+ produto</button><div class="total" id="total"></div>
+    </fieldset>
+    <fieldset><legend>Cobrança</legend>
+      ${CAMPO("cobranca", "Data de cobrança (combinada com o cliente)", "date")}
+      <label for="obs">Observação</label><textarea id="obs"></textarea>
+    </fieldset>`;
+} else {
+  $("#titulo").textContent = "📒 Débito anterior (talão)";
+  form.innerHTML = `
+    <fieldset><legend>Cliente</legend>
+      ${CAMPO("data", "Data de saída", "date")}
+      ${CAMPO("nome", "Nome")}
+      ${CAMPO("endereco", "Endereço")}
+      ${CAMPO("bairro", "Região")}
+    </fieldset>
+    <fieldset><legend>Produtos</legend><div id="produtos"></div>
+      <button type="button" class="add" id="add">+ produto</button><div class="total" id="total"></div>
+    </fieldset>
+    <fieldset><legend>Débito anterior</legend>
+      <div class="dupla"><div>${CAMPO("ant_valor", "Valor R$", "text", 'inputmode="decimal"')}</div>
+        <div>${CAMPO("ant_data", "Data", "date")}</div></div>
+    </fieldset>
+    <fieldset><legend>Recebimento (se já pagou algo)</legend>
+      <div class="dupla"><div>${CAMPO("rec_data", "Data", "date")}</div>
+        <div>${CAMPO("rec_valor", "Recebeu R$", "text", 'inputmode="decimal"')}</div></div>
+      <label for="rec_forma">Forma de pagamento</label>
+      <select id="rec_forma"><option value="informar">informar</option><option>dinheiro</option><option>pix</option><option>cartão</option></select>
+    </fieldset>
+    <fieldset><legend>Cobrança</legend>
+      ${CAMPO("cobranca", "Data de cobrança do restante", "date")}
+      <label for="obs">Observação</label><textarea id="obs"></textarea>
+    </fieldset>`;
+}
+$("#add").onclick = linhaProduto;
+linhaProduto();
+
+// O texto segue o modelo de talão que o bot já conhece; o cabeçalho diz de onde veio.
+function montarTexto() {
+  const ps = produtos();
+  if (tipo === "venda") {
+    const linhas = ps.map(p => `${p.qtd || "?"}x ${p.nome || "?"}${p.preco ? " " + reais(num(p.preco)) : " (preço de tabela)"}`);
+    return ["🛒 FORMULÁRIO VENDA", "", "VENDA", "",
+      `Data da venda: ${br(val("data"))}`, `Nome: ${val("nome")}`, `Endereço ou referência: ${val("endereco")}`,
+      `Bairro: ${val("bairro")}`, "Produtos (quantidade e preço):", ...linhas, "",
+      `Data de cobrança: ${br(val("cobranca"))}`, ...(val("obs") ? ["", `Obs: ${val("obs")}`] : [])].join("\n");
+  }
+  const linhas = ps.map(p => `${p.nome || "?"}: ${p.valor ? reais(num(p.valor)) : "R$"}`);
+  const ant = val("ant_valor") ? reais(num(val("ant_valor"))) : "R$";
+  const rec = val("rec_valor") ? reais(num(val("rec_valor"))) : "R$";
+  return ["📒 FORMULÁRIO DÉBITOS ANTERIORES", "", "COBRANÇA", "",
+    `Data de saida: ${br(val("data")) || "//"}`, `Nome: ${val("nome")}`, `Endereço: ${val("endereco")}`,
+    `Região: ${val("bairro")}`, "Produtos:", ...linhas, "",
+    `Débito anterior: ${ant} data: ${br(val("ant_data")) || "//"}`, "",
+    "Data recebimento:", `data: ${br(val("rec_data")) || "//"} recebeu: ${rec} forma de pagamento: ${val("rec_forma")} falta: R$`, "",
+    `Data de cobrança: ${br(val("cobranca"))}`, ...(val("obs") ? ["", `Obs: ${val("obs")}`] : [])].join("\n");
+}
+
+function conferir() {
+  if (!val("nome")) return "Falta o nome do cliente.";
+  const ps = produtos();
+  if (tipo === "venda" && !ps.some(p => p.nome)) return "Coloque pelo menos um produto.";
+  if (tipo === "divida" && !(ps.some(p => num(p.valor) > 0) || num(val("ant_valor")) > 0))
+    return "Coloque algum valor (produto ou débito anterior).";
+  return "";
+}
+
+$("#enviar").onclick = () => {
+  const erro = conferir();
+  $("#aviso").textContent = erro;
+  if (erro) return;
+  const texto = montarTexto();
+  // Aberto pelo botão do teclado o initData vem vazio; dentro do Telegram a plataforma não é "unknown".
+  if (tg && tg.platform && tg.platform !== "unknown") { tg.sendData(texto); return; }   // fecha a janela e manda ao bot
+  $("#saida").hidden = false; $("#saida").textContent = texto;  // fora do Telegram: só mostra
+};
+
+if (tg) { tg.ready(); tg.expand(); }
+</script>
+</body>
+</html>
