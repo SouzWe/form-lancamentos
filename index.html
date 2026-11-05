@@ -155,7 +155,7 @@ const linhasCadastro = () => [`Nome: ${val("c_nome")}`, `Celular: ${val("c_cel")
 function campoProduto() {
   if (!PRODUTOS.length) return `<input placeholder="Produto" data-k="nome">`;
   const ops = PRODUTOS.map((p, i) => `<option value="${i}">${esc(p[1])}${p[2] ? " (" + esc(p[2]) + ")" : ""}</option>`).join("");
-  return `<select data-k="sel"><option value="">Produto…</option>${ops}<option value="${OUTRO}">✏️ Outro (escrever)</option></select>`;
+  return `<select data-k="sel"><option value="">Produto…</option><option value="${OUTRO}">✏️ Outro (não está na lista)</option>${ops}</select>`;
 }
 const comQtd = () => tipo !== "divida";
 
@@ -176,7 +176,7 @@ function linhaProduto() {
   if (sel) sel.onchange = () => {
     if (sel.value === OUTRO) {   // troca a lista por campo livre nesta linha
       const inp = document.createElement("input");
-      inp.placeholder = "Produto"; inp.dataset.k = "nome"; inp.oninput = somar;
+      inp.placeholder = "Nome do produto"; inp.dataset.k = "nome"; inp.dataset.novo = "1"; inp.oninput = somar;
       sel.replaceWith(inp); inp.focus(); return;
     }
     const p = PRODUTOS[sel.value], preco = div.querySelector("[data-k=preco]");
@@ -190,7 +190,8 @@ function produtos() {
   return [...document.querySelectorAll("#produtos .linha")].map(l => {
     const g = k => (l.querySelector(`[data-k=${k}]`)?.value || "").trim();
     const p = PRODUTOS[g("sel")];
-    return { nome: p ? `${p[1]} (${p[0]})` : g("nome"), qtd: g("qtd"), preco: g("preco"), valor: g("valor"),
+    const novo = !p && g("nome") && (PRODUTOS.length || l.querySelector("[data-novo]"));
+    return { nome: p ? `${p[1]} (${p[0]})` : g("nome") + (novo ? " (produto novo)" : ""), qtd: g("qtd"), preco: g("preco"), valor: g("valor"),
              tabela: p ? Number(p[3]) : 0 };
   }).filter(p => p.nome || p.qtd || p.preco || p.valor);
 }
