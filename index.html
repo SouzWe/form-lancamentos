@@ -114,7 +114,8 @@ function produtos() {
   return [...document.querySelectorAll("#produtos .linha")].map(l => {
     const g = k => (l.querySelector(`[data-k=${k}]`)?.value || "").trim();
     const p = LISTA[g("sel")];
-    return { nome: p ? `${p[1]} (${p[0]})` : g("nome"), qtd: g("qtd"), preco: g("preco"), valor: g("valor") };
+    return { nome: p ? `${p[1]} (${p[0]})` : g("nome"), qtd: g("qtd"), preco: g("preco"), valor: g("valor"),
+             tabela: p ? Number(p[3]) : 0 };
   }).filter(p => p.nome || p.qtd || p.preco || p.valor);
 }
 
@@ -173,7 +174,13 @@ linhaProduto();
 function montarTexto() {
   const ps = produtos();
   if (tipo === "venda") {
-    const linhas = ps.map(p => `${p.qtd || "?"}x ${p.nome || "?"}${p.preco ? " " + reais(num(p.preco)) : " (preço de tabela)"}`);
+    // Preço diferente da tabela = desconto/combinado: o texto avisa para o bot não trocar pelo de tabela.
+    const linhas = ps.map(p => {
+      const preco = p.preco ? num(p.preco) : 0;
+      const extra = !p.preco ? " (preço de tabela)"
+        : p.tabela && Math.abs(preco - p.tabela) > 0.004 ? ` (preço combinado; tabela ${reais(p.tabela)})` : "";
+      return `${p.qtd || "?"}x ${p.nome || "?"}${p.preco ? " " + reais(preco) : ""}${extra}`;
+    });
     return ["🛒 FORMULÁRIO VENDA", "", "VENDA", "",
       `Data da venda: ${br(val("data"))}`, `Nome: ${val("nome")}`, `Endereço ou referência: ${val("endereco")}`,
       `Bairro: ${val("bairro")}`, "Produtos (quantidade e preço):", ...linhas, "",
