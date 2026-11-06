@@ -100,6 +100,14 @@ const sem = t => (t || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase(
 const CAMPO = (id, rotulo, tipoInput = "text", extra = "") =>
   `<label for="${id}">${rotulo}</label><input id="${id}" type="${tipoInput}" ${extra}>`;
 
+// Horários de 30 em 30 min, 08:00–20:00 (05/11): lista, sem digitar símbolo.
+const HORAS = [];
+for (let m = 8 * 60; m <= 20 * 60; m += 30) HORAS.push(String(Math.floor(m / 60)).padStart(2, "0") + ":" + String(m % 60).padStart(2, "0"));
+const LISTA_HORA = (id, rotulo, vazio = "— (sem horário)") =>
+  `<label for="${id}">${rotulo}</label><select id="${id}"><option value="">${vazio}</option>${HORAS.map(h => `<option>${h}</option>`).join("")}</select>`;
+const HORA_COBRANCA = LISTA_HORA("cobranca_hora", "Horário da cobrança");
+const linhaHoraCobranca = () => val("cobranca_hora") ? [`Horário de cobrança: ${val("cobranca_hora")}`] : [];
+
 // ---------- cliente já cadastrado: busca por nome ----------
 let clienteEscolhido = null;
 const BUSCA_CLIENTE = `<label for="busca">Cliente</label><div id="caixa-cliente">
@@ -143,8 +151,9 @@ const CADASTRO = `
   <input id="c_bairro_novo" class="oculto" placeholder="Nome do bairro novo" style="margin-top:8px">
   ${CAMPO("c_end", "Endereço")}
   ${CAMPO("c_ref", "Referência (ponto conhecido perto)")}
-  <div class="dupla"><div>${CAMPO("c_cep", "CEP", "text", 'inputmode="numeric"')}</div>
-    <div>${CAMPO("c_hora", "Melhor horário")}</div></div>
+  ${CAMPO("c_cep", "CEP", "text", 'inputmode="numeric"')}
+  <div class="dupla"><div>${LISTA_HORA("c_hora_de", "Melhor horário: das", "—")}</div>
+    <div>${LISTA_HORA("c_hora_ate", "às", "—")}</div></div>
   ${CAMPO("c_email", "E-mail", "email")}`;
 
 function ligarCadastro() {
@@ -158,9 +167,14 @@ function bairroTexto() {
   if (sel === OUTRO) return val("c_bairro_novo") ? `${val("c_bairro_novo")} (novo)` : "";
   return sel;
 }
+// Melhor horário: "das 08:00 às 12:00" (só um lado preenchido também vale).
+function melhorHorario() {
+  const de = val("c_hora_de"), ate = val("c_hora_ate");
+  return [de && `das ${de}`, ate && `às ${ate}`].filter(Boolean).join(" ");
+}
 const linhasCadastro = () => [`Nome: ${val("c_nome")}`, `Celular: ${val("c_cel")}`, `Bairro: ${bairroTexto()}`,
   `Endereço: ${val("c_end")}`, `Referência: ${val("c_ref")}`, `CEP: ${val("c_cep")}`,
-  `Melhor horário: ${val("c_hora")}`, `E-mail: ${val("c_email")}`];
+  `Melhor horário: ${melhorHorario()}`, `E-mail: ${val("c_email")}`];
 
 // ---------- produtos ----------
 function campoProduto() {
@@ -235,13 +249,13 @@ if (tipo === "venda") {
       ${CAMPO("data", "Data da venda", "date", `value="${hojeISO()}"`)}</fieldset>
     ${PRODUTOS_HTML("Produtos")}
     <fieldset><legend>Cobrança</legend>
-      ${CAMPO("cobranca", "Data de cobrança (se já combinou)", "date")}${OBS}</fieldset>`;
+      ${CAMPO("cobranca", "Data de cobrança (se já combinou)", "date")}${HORA_COBRANCA}${OBS}</fieldset>`;
 } else if (tipo === "cliente") {
   $("#titulo").textContent = "👤 Cliente novo";
   form.innerHTML = `
     <fieldset><legend>Cadastro</legend>${CADASTRO}${OBS}</fieldset>
     ${PRODUTOS_HTML("Primeira compra (se tiver)")}
-    <fieldset><legend>Cobrança</legend>${CAMPO("cobranca", "Data de cobrança (se já combinou)", "date")}</fieldset>`;
+    <fieldset><legend>Cobrança</legend>${CAMPO("cobranca", "Data de cobrança (se já combinou)", "date")}${HORA_COBRANCA}</fieldset>`;
 } else {
   $("#titulo").textContent = "📒 Débito anterior (talão)";
   form.innerHTML = `
@@ -260,7 +274,7 @@ if (tipo === "venda") {
       <label for="rec_forma">Forma de pagamento</label>
       <select id="rec_forma"><option value="informar">informar</option><option>dinheiro</option><option>pix</option><option>cartão</option></select>
     </fieldset>
-    <fieldset><legend>Cobrança</legend>${CAMPO("cobranca", "Data de cobrança do restante", "date")}${OBS}</fieldset>`;
+    <fieldset><legend>Cobrança</legend>${CAMPO("cobranca", "Data de cobrança do restante", "date")}${HORA_COBRANCA}${OBS}</fieldset>`;
   document.querySelectorAll(".abas button").forEach(b => b.onclick = () => {
     modoCliente = b.dataset.m;
     document.querySelectorAll(".abas button").forEach(x => x.classList.toggle("on", x === b));
@@ -276,12 +290,12 @@ ligarBusca(); ligarCadastro();
 function montarTexto() {
   if (tipo === "venda") {
     return ["🛒 FORMULÁRIO VENDA NOVA", "", `Cliente: ${nomeCliente()}`, `Data da venda: ${br(val("data"))}`,
-      "Produtos (quantidade e preço):", ...linhasVenda(), "", `Data de cobrança: ${br(val("cobranca"))}`, ...obsLinha()].join("\n");
+      "Produtos (quantidade e preço):", ...linhasVenda(), "", `Data de cobrança: ${br(val("cobranca"))}`, ...linhaHoraCobranca(), ...obsLinha()].join("\n");
   }
   if (tipo === "cliente") {
     const compra = linhasVenda();
     return ["👤 FORMULÁRIO CLIENTE NOVO", "", ...linhasCadastro(), ...obsLinha(),
-      ...(compra.length ? ["", "Primeira compra (quantidade e preço):", ...compra, "", `Data de cobrança: ${br(val("cobranca"))}`] : [])].join("\n");
+      ...(compra.length ? ["", "Primeira compra (quantidade e preço):", ...compra, "", `Data de cobrança: ${br(val("cobranca"))}`, ...linhaHoraCobranca()] : [])].join("\n");
   }
   const linhas = produtos().map(p => `${p.nome || "?"}: ${p.valor ? reais(num(p.valor)) : "R$"}`);
   const ant = val("ant_valor") ? reais(num(val("ant_valor"))) : "R$";
@@ -291,7 +305,7 @@ function montarTexto() {
     `Data de saida: ${br(val("data")) || "//"}`, "Produtos:", ...linhas, "",
     `Débito anterior: ${ant} data: ${br(val("ant_data")) || "//"}`, "",
     "Data recebimento:", `data: ${br(val("rec_data")) || "//"} recebeu: ${rec} forma de pagamento: ${val("rec_forma")} falta: R$`, "",
-    `Data de cobrança: ${br(val("cobranca"))}`, ...obsLinha()].join("\n");
+    `Data de cobrança: ${br(val("cobranca"))}`, ...linhaHoraCobranca(), ...obsLinha()].join("\n");
 }
 
 function conferir() {
