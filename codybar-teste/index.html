@@ -32,6 +32,8 @@
   .linha.venda { grid-template-columns: 1fr 64px 92px 36px; }
   .linha.talao { grid-template-columns: 1fr 104px 36px; }
   .linha input, .linha select { padding: 10px; }
+  .linha { position: relative; }
+  .pp .achados { position: absolute; left: 0; right: 0; z-index: 5; box-shadow: 0 6px 18px rgba(0,0,0,.3); }
   .tirar { height: 42px; border: 0; border-radius: 10px; background: var(--campo); color: var(--erro); font-size: 20px; }
   .add { width: 100%; padding: 10px; border: 1px dashed var(--dica); border-radius: 10px; background: none;
          color: var(--btn); font: inherit; }
@@ -179,8 +181,42 @@ const linhasCadastro = () => [`Nome: ${val("c_nome")}`, `Celular: ${val("c_cel")
 // ---------- produtos ----------
 function campoProduto() {
   if (!PRODUTOS.length) return `<input placeholder="Produto" data-k="nome">`;
-  const ops = PRODUTOS.map((p, i) => `<option value="${i}">${esc(p[1])}${p[2] ? " (" + esc(p[2]) + ")" : ""}</option>`).join("");
-  return `<select data-k="sel"><option value="">Produto…</option><option value="${OUTRO}">✏️ Outro (não está na lista)</option>${ops}</select>`;
+  // Lista própria (06/11): a lista nativa (<select>) não abre no Telegram do computador.
+  // Igual no celular e no PC: toca → abre a lista inteira; digitando, filtra.
+  return `<div class="pp"><input data-k="busca" placeholder="Produto… (toque ou digite)"><input type="hidden" data-k="sel"></div>`;
+}
+const rotuloProduto = p => p[1] + (p[2] ? ` (${p[2]})` : "");
+
+function ligarProduto(div) {
+  const pp = div.querySelector(".pp");
+  if (!pp) return;
+  const busca = pp.querySelector("[data-k=busca]"), sel = pp.querySelector("[data-k=sel]");
+  const lista = document.createElement("div");
+  lista.className = "achados"; pp.appendChild(lista);
+  const fechar = () => { lista.innerHTML = ""; };
+  const mostrar = () => {
+    const t = sem(busca.value.trim());
+    const itens = PRODUTOS.map((p, i) => [p, i]).filter(([p]) => !t || sem(p[1]).includes(t))
+      .sort((a, b) => t ? sem(b[0][1]).startsWith(t) - sem(a[0][1]).startsWith(t) : 0);
+    lista.innerHTML = `<button type="button" data-i="${OUTRO}">✏️ Outro (não está na lista)</button>`
+      + itens.map(([p, i]) => `<button type="button" data-i="${i}">${esc(p[1])}${p[2] ? ` <small>${esc(p[2])}</small>` : ""}</button>`).join("");
+    lista.querySelectorAll("[data-i]").forEach(b => b.onclick = () => escolher(b.dataset.i));
+  };
+  const escolher = i => {
+    fechar();
+    if (i === OUTRO) {   // troca a lista por campo livre nesta linha
+      const inp = document.createElement("input");
+      inp.placeholder = "Nome do produto"; inp.dataset.k = "nome"; inp.dataset.novo = "1"; inp.oninput = somar;
+      pp.replaceWith(inp); inp.focus(); return;
+    }
+    const p = PRODUTOS[i], preco = div.querySelector("[data-k=preco]");
+    sel.value = i; busca.value = rotuloProduto(p);
+    if (preco) { preco.value = String(p[3]).replace(".", ","); const q = div.querySelector("[data-k=qtd]"); if (!q.value) q.value = "1"; }
+    somar(); busca.blur();
+  };
+  busca.onfocus = busca.onclick = mostrar;
+  busca.oninput = () => { sel.value = ""; mostrar(); somar(); };
+  document.addEventListener("click", e => { if (!pp.contains(e.target)) fechar(); });
 }
 const comQtd = () => tipo !== "divida";
 
@@ -197,17 +233,7 @@ function linhaProduto() {
   }
   div.querySelector(".tirar").onclick = () => { div.remove(); somar(); };
   div.querySelectorAll("input").forEach(i => i.oninput = somar);
-  const sel = div.querySelector("[data-k=sel]");
-  if (sel) sel.onchange = () => {
-    if (sel.value === OUTRO) {   // troca a lista por campo livre nesta linha
-      const inp = document.createElement("input");
-      inp.placeholder = "Nome do produto"; inp.dataset.k = "nome"; inp.dataset.novo = "1"; inp.oninput = somar;
-      sel.replaceWith(inp); inp.focus(); return;
-    }
-    const p = PRODUTOS[sel.value], preco = div.querySelector("[data-k=preco]");
-    if (p && preco) { preco.value = String(p[3]).replace(".", ","); const q = div.querySelector("[data-k=qtd]"); if (!q.value) q.value = "1"; }
-    somar();
-  };
+  ligarProduto(div);
   $("#produtos").appendChild(div);
 }
 
