@@ -60,9 +60,7 @@
   /* 07/11: "Falta" em caixa igual ao Total; valor vermelho (saldo devedor), quitada em verde */
   .dica.caixa { display: flex; justify-content: space-between; align-items: center; padding: 12px 14px;
                 border-radius: 10px; background: var(--campo); font-size: 14px; margin-top: 10px; }
-  .dica.deve { border: 1px solid var(--erro); color: var(--erro); font-weight: 600; gap: 10px; }
-  .dica.deve span:first-child { font-size: 12px; flex: 1; }   /* texto menor à esquerda */
-  .dica.deve span:last-child { white-space: nowrap; }         /* preço inteiro à direita, sem quebrar */
+  .dica.deve b { color: var(--erro); }   /* 07/11: frase simples (caixa recusada), só o valor em vermelho */
   .dica.quitada { border: 1px solid var(--ok); color: var(--ok); font-weight: 600; }
   .dica.excesso { color: var(--erro); }
 </style>
@@ -281,11 +279,11 @@ function pagamento() {
   $("#fs-cobranca").classList.toggle("oculto", quitou);
   $("label[for=cobranca]").textContent = pg > 0 && !quitou ? "Data de cobrança do restante *" : "Data de cobrança *";
   const d = $("#pg_dica"), excesso = pg > t + 0.005;
-  d.className = "dica" + (!pg ? "" : excesso ? " excesso" : quitou ? " caixa quitada" : " caixa deve");
+  d.className = "dica" + (!pg ? "" : excesso ? " excesso" : quitou ? " caixa quitada" : " deve");
   d.innerHTML = !pg ? "Não pagou agora? Deixe em branco e marque a data da cobrança."
     : excesso ? "Pago maior que o total da venda."
     : quitou ? "<span>✅ Venda quitada</span><span>sem cobrança</span>"
-    : `<span>🔴 Falta ${reais(t - pg)}: marque a data do restante.</span><span>Total ${reais(t)}</span>`;
+    : `Falta <b>${reais(t - pg)}</b>: marque a data da cobrança do restante.`;
 }
 
 // Preço diferente da tabela = desconto/combinado: o texto avisa para o bot não trocar pelo de tabela.
