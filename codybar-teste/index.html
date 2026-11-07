@@ -60,8 +60,7 @@
   /* 07/11: "Falta" em caixa igual ao Total; valor vermelho (saldo devedor), quitada em verde */
   .dica.caixa { display: flex; justify-content: space-between; align-items: center; padding: 12px 14px;
                 border-radius: 10px; background: var(--campo); font-size: 14px; margin-top: 10px; }
-  .dica.caixa b { font-size: 20px; }
-  .dica.deve { border: 1px solid var(--erro); } .dica.deve b { color: var(--erro); }
+  .dica.deve { border: 1px solid var(--erro); color: var(--erro); font-weight: 600; }
   .dica.quitada { border: 1px solid var(--ok); color: var(--ok); font-weight: 600; }
   .dica.excesso { color: var(--erro); }
 </style>
@@ -284,7 +283,7 @@ function pagamento() {
   d.innerHTML = !pg ? "Não pagou agora? Deixe em branco e marque a data da cobrança."
     : excesso ? "Pago maior que o total da venda."
     : quitou ? "<span>✅ Venda quitada</span><span>sem cobrança</span>"
-    : `<span>Falta (marque a data abaixo)</span><b>${reais(t - pg)}</b>`;
+    : `<span>🔴 Falta ${reais(t - pg)}: marque a data do restante.</span><span>Total ${reais(t)}</span>`;
 }
 
 // Preço diferente da tabela = desconto/combinado: o texto avisa para o bot não trocar pelo de tabela.
