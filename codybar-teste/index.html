@@ -60,7 +60,9 @@
   /* 07/11: "Falta" em caixa igual ao Total; valor vermelho (saldo devedor), quitada em verde */
   .dica.caixa { display: flex; justify-content: space-between; align-items: center; padding: 12px 14px;
                 border-radius: 10px; background: var(--campo); font-size: 14px; margin-top: 10px; }
-  .dica.deve { border: 1px solid var(--erro); color: var(--erro); font-weight: 600; }
+  .dica.deve { border: 1px solid var(--erro); color: var(--erro); font-weight: 600; gap: 10px; }
+  .dica.deve span:first-child { font-size: 12px; flex: 1; }   /* texto menor à esquerda */
+  .dica.deve span:last-child { white-space: nowrap; }         /* preço inteiro à direita, sem quebrar */
   .dica.quitada { border: 1px solid var(--ok); color: var(--ok); font-weight: 600; }
   .dica.excesso { color: var(--erro); }
 </style>
