@@ -240,11 +240,18 @@ function linhaProduto() {
 function produtos() {
   return [...document.querySelectorAll("#produtos .linha")].map(l => {
     const g = k => (l.querySelector(`[data-k=${k}]`)?.value || "").trim();
-    const p = PRODUTOS[g("sel")];
+    // Digitou e não tocou na lista: aceita se o texto bate com 1 produto só (06/11).
+    let p = PRODUTOS[g("sel")];
+    const t = sem(g("busca"));
+    if (!p && t) {
+      const ach = PRODUTOS.filter(x => sem(x[1]) === t || sem(rotuloProduto(x)) === t);
+      const parc = ach.length ? ach : PRODUTOS.filter(x => sem(x[1]).includes(t));
+      if (parc.length === 1) p = parc[0];
+    }
     const novo = !p && g("nome") && (PRODUTOS.length || l.querySelector("[data-novo]"));
-    return { nome: p ? `${p[1]} (${p[0]})` : g("nome") + (novo ? " (produto novo)" : ""), qtd: g("qtd"), preco: g("preco"), valor: g("valor"),
-             tabela: p ? Number(p[3]) : 0 };
-  }).filter(p => p.nome || p.qtd || p.preco || p.valor);
+    return { nome: p ? `${p[1]} (${p[0]})` : g("nome") + (novo ? " (produto novo)" : ""), qtd: g("qtd") || (p && comQtd() ? "1" : ""), preco: g("preco"), valor: g("valor"),
+             tabela: p ? Number(p[3]) : 0, busca: p ? "" : g("busca") };
+  }).filter(p => p.nome || p.busca || p.qtd || p.preco || p.valor);
 }
 
 function somar() {
@@ -338,11 +345,13 @@ function conferir() {
   const ps = produtos();
   if (tipo === "venda") {
     if (!nomeCliente()) return "Escolha o cliente.";
+    if (ps.some(p => !p.nome && p.busca)) return "Toque no produto na lista (ou em ✏️ Outro).";
     if (!ps.some(p => p.nome)) return "Coloque pelo menos um produto.";
   } else if (tipo === "cliente") {
     if (!val("c_nome")) return "Falta o nome do cliente.";
   } else {
     if (modoCliente === "novo" ? !val("c_nome") : !nomeCliente()) return "Falta o cliente.";
+    if (ps.some(p => !p.nome && p.busca)) return "Toque no produto na lista (ou em ✏️ Outro).";
     if (!(ps.some(p => num(p.valor) > 0) || num(val("ant_valor")) > 0)) return "Coloque algum valor (produto ou débito anterior).";
   }
   return "";
