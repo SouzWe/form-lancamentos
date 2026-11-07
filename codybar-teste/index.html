@@ -39,11 +39,7 @@
   .add { width: 100%; padding: 10px; border: 1px dashed var(--dica); border-radius: 10px; background: none;
          color: var(--btn); font: inherit; }
   .dupla { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-  .total { margin-top: 10px; }
-  .total:not(:empty) { display: flex; justify-content: space-between; align-items: center; padding: 12px 14px;
-                       border-radius: 10px; background: var(--campo); border: 1px solid var(--btn); }
-  .total span { color: var(--dica); font-size: 14px; }
-  .total b { font-size: 20px; }
+  .total { text-align: right; font-weight: 600; margin-top: 8px; }
   .enviar { position: fixed; left: 16px; right: 16px; bottom: 16px; padding: 14px; border: 0; border-radius: 12px;
             background: var(--btn); color: var(--btn-txt); font: 600 17px/1 inherit; }
   .aviso { color: var(--erro); font-size: 14px; min-height: 20px; }
@@ -271,7 +267,7 @@ function produtos() {
 const totalVenda = () => produtos().reduce((s, p) => s + (comQtd() ? num(p.qtd || 1) * num(p.preco) : num(p.valor)), 0);
 function somar() {
   const t = totalVenda();
-  $("#total").innerHTML = t > 0 ? `<span>Total</span><b>${reais(t)}</b>` : "";   // 07/11: caixa em destaque
+  $("#total").textContent = t > 0 ? "Total: " + reais(t) : "";   // 07/11: caixa testada e recusada, voltou o texto simples
   pagamento();
 }
 
