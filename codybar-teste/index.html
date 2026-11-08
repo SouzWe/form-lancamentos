@@ -212,7 +212,7 @@ if (matchMedia("(pointer: coarse)").matches) {
 
 // ---------- cliente já cadastrado: busca por nome ----------
 let clienteEscolhido = null;
-const BUSCA_CLIENTE = `<label for="busca">Cliente</label><div id="caixa-cliente">
+const BUSCA_CLIENTE = `<div id="caixa-cliente">
   <input id="busca" placeholder="${CLIENTES.length ? "Cliente… (toque ou digite)" : "Nome do cliente"}"><div class="achados" id="achados"></div></div>`;
 
 function ligarBusca() {
@@ -421,7 +421,7 @@ let modoCliente = "cadastrado";   // débitos anteriores: "cadastrado" ou "novo"
 if (tipo === "venda") {
   $("#titulo").textContent = "🛒 Venda nova";
   form.innerHTML = `
-    <fieldset>${BUSCA_CLIENTE}
+    <fieldset><legend>Cliente</legend>${BUSCA_CLIENTE}
       ${BLOCO_CEL}
       ${CAMPO("data", "Data da venda", "date", `value="${hojeISO()}"`)}</fieldset>
     ${PRODUTOS_HTML("Produtos")}
@@ -441,7 +441,7 @@ if (tipo === "venda") {
   form.innerHTML = `
     <div class="abas"><button type="button" data-m="cadastrado" class="on">Já cadastrado</button>
       <button type="button" data-m="novo">Cadastrar agora</button></div>
-    <fieldset>
+    <fieldset><legend>Cliente</legend>
       <div id="m-cadastrado">${BUSCA_CLIENTE}${BLOCO_CEL}</div><div id="m-novo" class="oculto">${CADASTRO}</div></fieldset>
     <fieldset><legend>Talão</legend>${CAMPO("data", "Data de saída", "date")}</fieldset>
     ${PRODUTOS_HTML("Produtos")}
