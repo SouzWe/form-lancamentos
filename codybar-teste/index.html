@@ -66,7 +66,8 @@
   .cel-fixo .ddi input { border: 1px solid var(--fixo); }
   #bloco-cel.cel-fixo .dica { color: var(--fixo); }
   /* 08/11 (Wellington): situação do cliente ao escolher o nome — deve = vermelho, não deve = verde */
-  .situacao { font-size: 13px; margin-top: 8px; line-height: 1.5; }
+  .situacao { font-size: 13px; margin-top: 16px; line-height: 1.5; }   /* 08/11: uma linha de espaço depois do celular */
+  #cel_dica { display: none; }   /* 08/11 (Wellington): menos informação — a cor do rótulo/borda do WhatsApp já mostra o estado */
   .situacao .deve, .situacao .total { color: var(--dica); }     /* 08/11: texto cinza (cor das dicas)… */
   .situacao .deve b, .situacao .total b { color: var(--erro); }  /* …só o valor em vermelho (igual ao "Falta R$ X") */
   .situacao .total { text-align: left; margin-top: 2px; }
@@ -420,7 +421,7 @@ let modoCliente = "cadastrado";   // débitos anteriores: "cadastrado" ou "novo"
 if (tipo === "venda") {
   $("#titulo").textContent = "🛒 Venda nova";
   form.innerHTML = `
-    <fieldset><legend>Cliente</legend>${BUSCA_CLIENTE}
+    <fieldset>${BUSCA_CLIENTE}
       ${BLOCO_CEL}
       ${CAMPO("data", "Data da venda", "date", `value="${hojeISO()}"`)}</fieldset>
     ${PRODUTOS_HTML("Produtos")}
@@ -440,7 +441,7 @@ if (tipo === "venda") {
   form.innerHTML = `
     <div class="abas"><button type="button" data-m="cadastrado" class="on">Já cadastrado</button>
       <button type="button" data-m="novo">Cadastrar agora</button></div>
-    <fieldset><legend>Cliente</legend>
+    <fieldset>
       <div id="m-cadastrado">${BUSCA_CLIENTE}${BLOCO_CEL}</div><div id="m-novo" class="oculto">${CADASTRO}</div></fieldset>
     <fieldset><legend>Talão</legend>${CAMPO("data", "Data de saída", "date")}</fieldset>
     ${PRODUTOS_HTML("Produtos")}
