@@ -526,6 +526,8 @@ function pintarCel(id, saindo) {
     if (msg) msg.textContent = e && !ehSemDDD(e) ? e : "";
   } else if (!e) {                                                  // corrigindo: tira o vermelho assim que ficar certo
     campo.classList.remove("sem-ddd"); caixa.classList.remove("campo-ruim"); if (msg) msg.textContent = "";
+  } else if (digitosCel(inp.value).length > 11) {                  // 08/11: número a mais já fica vermelho ao digitar
+    caixa.classList.add("campo-ruim"); if (msg) msg.textContent = "Número com dígitos a mais.";
   }
 }
 function ligarCel(id) {
