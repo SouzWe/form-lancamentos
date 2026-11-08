@@ -119,6 +119,31 @@ const LISTA_HORA = (id, rotulo, vazio = "— (sem horário)") =>
 const HORA_COBRANCA = LISTA_HORA("cobranca_hora", "Horário da cobrança");
 const linhaHoraCobranca = () => val("cobranca_hora") ? [`Horário de cobrança: ${val("cobranca_hora")}`] : [];
 
+// ---------- lista acima do teclado (07/11, Wellington) ----------
+// Ao tocar no campo: a tela rola até o campo ficar no topo e a lista encolhe para caber
+// entre o campo e o teclado (rola dentro dela). Vale para cliente e produto.
+const alturaVisivel = () => Math.min(window.visualViewport ? visualViewport.height : innerHeight, innerHeight);
+function encaixar(input, lista) {
+  if (!matchMedia("(pointer: coarse)").matches) return;   // só no celular (no PC não há teclado na tela)
+  const ajustar = () => {
+    if (!input.isConnected || !lista.innerHTML) return;
+    const livre = alturaVisivel() - input.getBoundingClientRect().bottom - 12;
+    lista.style.maxHeight = Math.max(120, livre) + "px";
+  };
+  const subir = () => {
+    document.body.style.paddingBottom = "70vh";   // espaço para o campo conseguir subir até o topo
+    const y = input.getBoundingClientRect().top + scrollY - 12;
+    window.scrollTo({ top: y, behavior: "smooth" });
+    [150, 400, 800].forEach(ms => setTimeout(ajustar, ms));   // espera o teclado abrir
+  };
+  input.addEventListener("focus", subir);
+  input.addEventListener("input", ajustar);
+  input.addEventListener("blur", () => setTimeout(() => {
+    if (!document.activeElement || !document.activeElement.matches("#busca, [data-k=busca]")) document.body.style.paddingBottom = "";
+  }, 200));
+  if (window.visualViewport) visualViewport.addEventListener("resize", ajustar);
+}
+
 // ---------- cliente já cadastrado: busca por nome ----------
 let clienteEscolhido = null;
 const BUSCA_CLIENTE = `<label for="busca">Cliente</label><div id="caixa-cliente">
@@ -139,6 +164,7 @@ function ligarBusca() {
     achados.querySelectorAll("[data-id]").forEach(b => b.onclick = () => escolherCliente(CLIENTES.find(c => c[0] === b.dataset.id)));
   };
   busca.oninput = busca.onfocus = busca.onclick = mostrar;
+  encaixar(busca, achados);
   document.addEventListener("click", e => { if (e.target.isConnected && $("#caixa-cliente") && !$("#caixa-cliente").contains(e.target)) achados.innerHTML = ""; });
 }
 function escolherCliente(c) {
@@ -225,6 +251,7 @@ function ligarProduto(div) {
     somar(); busca.blur();
   };
   busca.onfocus = busca.onclick = mostrar;
+  encaixar(busca, lista);
   busca.oninput = () => { sel.value = ""; mostrar(); somar(); };
   document.addEventListener("click", e => { if (!pp.contains(e.target)) fechar(); });
 }
