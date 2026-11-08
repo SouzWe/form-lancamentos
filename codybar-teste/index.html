@@ -139,9 +139,32 @@ function encaixar(input, lista) {
   input.addEventListener("focus", subir);
   input.addEventListener("input", ajustar);
   input.addEventListener("blur", () => setTimeout(() => {
-    if (!document.activeElement || !document.activeElement.matches("#busca, [data-k=busca]")) document.body.style.paddingBottom = "";
+    const a = document.activeElement;
+    if (!a || !a.matches || !a.matches("#busca, [data-k=busca], " + CAMPO_DIGITAR)) document.body.style.paddingBottom = "";
   }, 200));
   if (window.visualViewport) visualViewport.addEventListener("resize", ajustar);
+}
+
+// ---------- todo campo de digitar sobe acima do teclado (08/11, Wellington) ----------
+// Endereço, CEP, celular, obs etc.: ao tocar, a tela rola e o campo fica no topo (com o título dele visível).
+// Cliente/produto já sobem pelo encaixar(). Data, hora e listas de escolha abrem seletor próprio → não mexe.
+const CAMPO_DIGITAR = 'input:not([type=date]):not([type=time]):not([type=checkbox]):not([type=radio]), textarea';
+if (matchMedia("(pointer: coarse)").matches) {
+  document.addEventListener("focusin", e => {
+    const el = e.target;
+    if (!el.matches || !el.matches(CAMPO_DIGITAR) || el.matches("#busca, [data-k=busca]")) return;
+    document.body.style.paddingBottom = "70vh";
+    const subir = () => {
+      if (document.activeElement !== el) return;
+      const y = el.getBoundingClientRect().top + scrollY - 40;   // 40px = título do campo aparece
+      window.scrollTo({ top: y, behavior: "smooth" });
+    };
+    [50, 350].forEach(ms => setTimeout(subir, ms));   // de novo depois do teclado abrir
+  });
+  document.addEventListener("focusout", () => setTimeout(() => {
+    const a = document.activeElement;
+    if (!a || !a.matches || !a.matches(CAMPO_DIGITAR)) document.body.style.paddingBottom = "";
+  }, 200));
 }
 
 // ---------- cliente já cadastrado: busca por nome ----------
