@@ -311,7 +311,7 @@ function pagamento() {
   d.innerHTML = !pg ? "Não pagou agora? Deixe em branco e marque a data da cobrança."
     : excesso ? "Pago maior que o total da venda."
     : quitou ? "<span>✅ Venda quitada</span><span>sem cobrança</span>"
-    : `Falta <b>${reais(t - pg)}</b>: marque a data da cobrança do restante.`;
+    : `Falta <b>${reais(t - pg)}</b> marque a data da cobrança do restante.`;
 }
 
 // Preço diferente da tabela = desconto/combinado: o texto avisa para o bot não trocar pelo de tabela.
