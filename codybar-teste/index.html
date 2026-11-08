@@ -469,7 +469,7 @@ if (tipo === "venda") {
 $("#add").onclick = linhaProduto;
 if ($("#pg_valor")) $("#pg_valor").oninput = pagamento;
 // 💬 Pergunta ao assistente (08/11, teste do Wellington — se não gostar, remover este bloco e o do botão)
-form.insertAdjacentHTML("beforeend", `<fieldset><legend>💬 Perguntar ao assistente</legend>
+if (tipo !== "cliente") form.insertAdjacentHTML("beforeend", `<fieldset><legend>💬 Perguntar ao assistente</legend>
   <textarea id="pergunta" placeholder="Ex.: quanto esse cliente comprou este mês? · quem tem cobrança vencida hoje?"></textarea>
   <button type="button" class="perguntar" id="perguntar">Perguntar</button>
   <div class="dica">Não grava nada. A resposta chega na conversa.</div></fieldset>`);
@@ -666,18 +666,21 @@ function entregar(texto) {
   $("#saida").hidden = false; $("#saida").textContent = texto;  // fora do Telegram: só mostra
 }
 $("#enviar").onclick = () => {
+  const nadaLancado = !produtos().some(p => p.nome || p.busca) && !val("ant_valor") && !val("pg_valor") && !val("rec_valor");
+  if ($("#pergunta") && val("pergunta") && nadaLancado) { perguntar(); return; }
   const erro = conferir();
   mostrarAviso(erro);
   if (erro) return;
   entregar(montarTexto());
 };
-$("#perguntar").onclick = () => {
+// 08/11 (Wellington): basta o cliente escolhido (os dados dele já aparecem); sem cliente, bloqueia.
+function perguntar() {
+  if (!clienteEscolhido) { mostrarAviso("Escolha o cliente para perguntar."); return; }
   const p = val("pergunta");
   if (!p) { mostrarAviso("Escreva a pergunta."); return; }
-  const cli = clienteEscolhido ? [`Cliente: ${clienteEscolhido[1]} (${clienteEscolhido[0]})`]
-    : val("c_nome") ? [`Cliente (ainda não cadastrado): ${val("c_nome")}`] : [];
-  entregar(["💬 PERGUNTA AO ASSISTENTE", "", ...cli, `Pergunta: ${p}`].join("\n"));
-};
+  entregar(["💬 PERGUNTA AO ASSISTENTE", "", `Cliente: ${clienteEscolhido[1]} (${clienteEscolhido[0]})`, `Pergunta: ${p}`].join("\n"));
+}
+if ($("#perguntar")) $("#perguntar").onclick = perguntar;
 
 if (tg) { tg.ready(); tg.expand(); }
 }
