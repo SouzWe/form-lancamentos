@@ -67,8 +67,9 @@
   #bloco-cel.cel-fixo .dica { color: var(--fixo); }
   /* 08/11 (Wellington): situação do cliente ao escolher o nome — deve = vermelho, não deve = verde */
   .situacao { font-size: 13px; margin-top: 8px; line-height: 1.5; }
-  .situacao .deve { color: var(--erro); }
-  .situacao .total { text-align: left; margin-top: 2px; color: var(--erro); }
+  .situacao .deve, .situacao .total { color: var(--txt); }      /* 08/11: texto branco (cor do tema)… */
+  .situacao .deve b, .situacao .total b { color: var(--erro); }  /* …só o valor em vermelho (igual ao "Falta R$ X") */
+  .situacao .total { text-align: left; margin-top: 2px; }
   .situacao .limpo { color: var(--ok); font-weight: 600; }
   .sem-ddd .ddi input { border: 1px solid var(--erro); }
   /* 08/11: CEP — 8 números: certo = borda verde, errado = borda vermelha; vazio pode */
