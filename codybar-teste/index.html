@@ -43,6 +43,18 @@
   .enviar { position: fixed; left: 16px; right: 16px; bottom: 16px; padding: 14px; border: 0; border-radius: 12px;
             background: var(--btn); color: var(--btn-txt); font: 600 17px/1 inherit; }
   .aviso { color: var(--erro); font-size: 14px; min-height: 20px; }
+  /* 08/11 (Wellington): erro ao enviar aparece no TOPO da tela (acima do teclado), em faixa vermelha */
+  .aviso:not(:empty) { position: fixed; left: 16px; right: 16px; top: 8px; z-index: 50; min-height: 0;
+    background: var(--erro); color: #fff; font-weight: 600; padding: 12px 14px; border-radius: 12px;
+    box-shadow: 0 6px 18px rgba(0,0,0,.35); }
+  /* 08/11: celular com +55 fixo na frente (número completo para a automação) */
+  .ddi { display: flex; gap: 6px; align-items: stretch; }
+  .ddi span { display: flex; align-items: center; padding: 0 10px; border-radius: 10px; background: var(--campo);
+    color: var(--dica); font-weight: 600; }
+  .ddi input { flex: 1; min-width: 0; }
+  .campo-ruim input { border: 1px solid var(--erro); }
+  .cel-msg { color: var(--erro); font-size: 13px; margin-top: 6px; }
+  .cel-msg:empty { display: none; }
   pre { white-space: pre-wrap; background: var(--campo); padding: 12px; border-radius: 10px; font-size: 13px; }
   .abas { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; background: var(--campo); padding: 4px;
           border-radius: 12px; margin-bottom: 14px; }
@@ -115,6 +127,10 @@ const sem = t => (t || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase(
 
 const CAMPO = (id, rotulo, tipoInput = "text", extra = "") =>
   `<label for="${id}">${rotulo}</label><input id="${id}" type="${tipoInput}" ${extra}>`;
+// Celular/WhatsApp (08/11): +55 fixo na frente; digita só DDD + número. Fixo de empresa (DDD + 8) também vale.
+const CAMPO_CEL = (id, msg = true) => `<label for="${id}">Celular / WhatsApp (com DDD)</label>
+  <div class="ddi" id="${id}_caixa"><span>+55</span><input id="${id}" type="tel" inputmode="tel" placeholder="(11) 98586-7941"></div>
+  ${msg ? `<div class="cel-msg" id="${id}_msg"></div>` : ""}`;
 
 // Horários de 30 em 30 min, 08:00–20:00 (05/11): lista, sem digitar símbolo.
 const HORAS = [];
@@ -217,7 +233,7 @@ const nomeCliente = () => clienteEscolhido ? `${clienteEscolhido[1]} (${clienteE
 const opsBairro = BAIRROS.map(b => `<option>${esc(b)}</option>`).join("");
 const CADASTRO = `
   ${CAMPO("c_nome", "Nome *")}
-  ${CAMPO("c_cel", "Celular (com DDD)", "tel", 'placeholder="(11) 98586-7941"')}
+  ${CAMPO_CEL("c_cel")}
   <label for="c_bairro">Bairro</label>
   <select id="c_bairro"><option value="">—</option>${opsBairro}<option value="${OUTRO}">Outros (escrever)</option></select>
   <input id="c_bairro_novo" class="oculto" placeholder="Nome do bairro novo" style="margin-top:8px">
@@ -244,7 +260,7 @@ function melhorHorario() {
   const de = val("c_hora_de"), ate = val("c_hora_ate");
   return [de && `das ${de}`, ate && `às ${ate}`].filter(Boolean).join(" ");
 }
-const linhasCadastro = () => [`Nome: ${val("c_nome")}`, `Celular: ${val("c_cel")}`, `Bairro: ${bairroTexto()}`,
+const linhasCadastro = () => [`Nome: ${val("c_nome")}`, `Celular: ${val("c_cel") ? "+55 " + formatarCel(val("c_cel")) : ""}`, `Bairro: ${bairroTexto()}`,
   `Endereço: ${val("c_end")}`, `Referência: ${val("c_ref")}`, `CEP: ${val("c_cep")}`,
   `Melhor horário: ${melhorHorario()}`, `E-mail: ${val("c_email")}`];
 
@@ -367,9 +383,9 @@ const PAGAMENTO_HTML = `<fieldset><legend>Pagamento</legend>
 const COBRANCA_HTML = `<fieldset id="fs-cobranca"><legend>Cobrança</legend>
       ${CAMPO("cobranca", "Data de cobrança *", "date")}${HORA_COBRANCA}</fieldset>`;
 // Celular do cliente já cadastrado (08/11): Venda nova e Débitos › Já cadastrado
-const BLOCO_CEL = `<div id="bloco-cel" class="oculto">${CAMPO("v_cel", "Celular (com DDD)", "tel", 'placeholder="(11) 98586-7941"')}<div class="dica" id="cel_dica"></div></div>`;
+const BLOCO_CEL = `<div id="bloco-cel" class="oculto">${CAMPO_CEL("v_cel", false)}<div class="dica" id="cel_dica"></div></div>`;
 const linhaCel = () => !val("v_cel") ? "Celular: não informado"
-  : celMudou() ? `Celular: ${formatarCel(val("v_cel"))} (novo — atualizar cadastro)` : `Celular: ${formatarCel(val("v_cel"))}`;
+  : celMudou() ? `Celular: +55 ${formatarCel(val("v_cel"))} (novo — atualizar cadastro)` : `Celular: +55 ${formatarCel(val("v_cel"))}`;
 const PRODUTOS_HTML = (titulo) => `<fieldset><legend>${titulo}</legend><div id="produtos"></div>
   <button type="button" class="add" id="add">+ produto</button><div class="total" id="total"></div></fieldset>`;
 const OBS = `<label for="obs">Observação</label><textarea id="obs"></textarea>`;
@@ -423,7 +439,7 @@ if (tipo === "venda") {
 $("#add").onclick = linhaProduto;
 if ($("#pg_valor")) $("#pg_valor").oninput = pagamento;
 linhaProduto();   // linha vazia é ignorada no envio (primeira compra do cliente novo é opcional)
-ligarBusca(); ligarCadastro();
+ligarBusca(); ligarCadastro(); ligarCel("c_cel"); ligarCel("v_cel");
 
 // ---------- texto enviado ao bot ----------
 function montarTexto() {
@@ -457,12 +473,32 @@ function montarTexto() {
 }
 
 // Celular (08/11): trava no formulário, igual à regra do motor (DDD + número = 10 ou 11 dígitos; +55 aceito)
-const CEL_ERRO = "Celular sem DDD: coloque DDD + número (ex.: (11) 98586-7941).";
-function celularRuim(id = "c_cel") {
+// Celular = DDD + 9 + 8 dígitos (11); fixo de empresa (WhatsApp Business) = DDD + 8 dígitos (10). +55 aceito.
+function erroCel(id) {
   let d = val(id).replace(/\D/g, "");
-  if (!d) return false;   // celular é opcional
+  if (!d) return "";   // celular é opcional
   if (d.length > 11 && d.startsWith("55")) d = d.slice(2);
-  return d.length !== 10 && d.length !== 11;
+  if (d.length === 8 || d.length === 9) return "Celular sem DDD: coloque o DDD antes, ex.: (11) 98586-7941.";
+  if (d.length === 11 && d[2] !== "9") return "Celular com 11 números precisa ter o 9 depois do DDD, ex.: (11) 98586-7941.";
+  if (d.length !== 10 && d.length !== 11) return "Número com quantidade errada: DDD + número (celular 11 dígitos, fixo 10).";
+  return "";
+}
+let CEL_ERRO = "";
+function celularRuim(id = "c_cel") { CEL_ERRO = erroCel(id); return !!CEL_ERRO; }
+// Ao sair do campo: vermelho + mensagem se estiver errado; certo = arruma a máscara (11) 98586-7941
+function ligarCel(id) {
+  const inp = $("#" + id);
+  if (!inp) return;
+  inp.addEventListener("blur", () => {
+    const e = erroCel(id), caixa = $("#" + id + "_caixa"), msg = $("#" + id + "_msg");
+    if (!e && inp.value) inp.value = formatarCel(inp.value);
+    caixa.classList.toggle("campo-ruim", !!e);
+    if (msg) msg.textContent = e;
+    if (id === "v_cel") estadoCel();
+  });
+  inp.addEventListener("input", () => {   // corrigindo: tira o vermelho assim que ficar certo
+    if (!erroCel(id)) { $("#" + id + "_caixa").classList.remove("campo-ruim"); const m = $("#" + id + "_msg"); if (m) m.textContent = ""; }
+  });
 }
 
 const digitosCel = v => { let d = String(v || "").replace(/\D/g, ""); if (d.length > 11 && d.startsWith("55")) d = d.slice(2); return d; };
@@ -480,6 +516,7 @@ function estadoCel() {
   if (!b) return;
   const vazio = !val("v_cel"), ruim = !vazio && celularRuim("v_cel");
   b.className = vazio || ruim ? "cel-falta" : "cel-ok";
+  $("#v_cel_caixa").classList.toggle("campo-ruim", ruim);
   d.textContent = vazio ? "⚠️ Cliente sem celular cadastrado: peça o número."
     : ruim ? CEL_ERRO
     : celMudou() ? (celCadastro() ? "✏️ Número novo: vai atualizar o cadastro." : "✏️ Número novo: vai entrar no cadastro.")
@@ -521,9 +558,20 @@ function conferir() {
   return "";
 }
 
+// 08/11: o aviso de erro fica no topo da parte visível da tela (acima do teclado, se estiver aberto) e some ao corrigir
+let avisoTimer;
+function mostrarAviso(t) {
+  const a = $("#aviso");
+  a.textContent = t;
+  if (!t) return;
+  a.style.top = ((window.visualViewport ? visualViewport.offsetTop : 0) + 8) + "px";
+  clearTimeout(avisoTimer); avisoTimer = setTimeout(() => { a.textContent = ""; }, 6000);
+}
+document.addEventListener("input", () => { if ($("#aviso").textContent) $("#aviso").textContent = ""; });
+
 $("#enviar").onclick = () => {
   const erro = conferir();
-  $("#aviso").textContent = erro;
+  mostrarAviso(erro);
   if (erro) return;
   const texto = montarTexto();
   // Aberto pelo botão do teclado o initData vem vazio; dentro do Telegram a plataforma não é "unknown".
