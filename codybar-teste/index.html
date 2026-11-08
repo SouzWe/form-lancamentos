@@ -366,6 +366,10 @@ const PAGAMENTO_HTML = `<fieldset><legend>Pagamento</legend>
       <div class="dica" id="pg_dica">Não pagou agora? Deixe em branco e marque a data da cobrança.</div></fieldset>`;
 const COBRANCA_HTML = `<fieldset id="fs-cobranca"><legend>Cobrança</legend>
       ${CAMPO("cobranca", "Data de cobrança *", "date")}${HORA_COBRANCA}</fieldset>`;
+// Celular do cliente já cadastrado (08/11): Venda nova e Débitos › Já cadastrado
+const BLOCO_CEL = `<div id="bloco-cel" class="oculto">${CAMPO("v_cel", "Celular (com DDD)", "tel", 'placeholder="(11) 98586-7941"')}<div class="dica" id="cel_dica"></div></div>`;
+const linhaCel = () => !val("v_cel") ? "Celular: não informado"
+  : celMudou() ? `Celular: ${formatarCel(val("v_cel"))} (novo — atualizar cadastro)` : `Celular: ${formatarCel(val("v_cel"))}`;
 const PRODUTOS_HTML = (titulo) => `<fieldset><legend>${titulo}</legend><div id="produtos"></div>
   <button type="button" class="add" id="add">+ produto</button><div class="total" id="total"></div></fieldset>`;
 const OBS = `<label for="obs">Observação</label><textarea id="obs"></textarea>`;
@@ -378,7 +382,7 @@ if (tipo === "venda") {
   $("#titulo").textContent = "🛒 Venda nova";
   form.innerHTML = `
     <fieldset><legend>Cliente</legend>${BUSCA_CLIENTE}
-      <div id="bloco-cel" class="oculto">${CAMPO("v_cel", "Celular (com DDD)", "tel", 'placeholder="(11) 98586-7941"')}<div class="dica" id="cel_dica"></div></div>
+      ${BLOCO_CEL}
       ${CAMPO("data", "Data da venda", "date", `value="${hojeISO()}"`)}</fieldset>
     ${PRODUTOS_HTML("Produtos")}
     ${PAGAMENTO_HTML}
@@ -396,7 +400,7 @@ if (tipo === "venda") {
     <div class="abas"><button type="button" data-m="cadastrado" class="on">Já cadastrado</button>
       <button type="button" data-m="novo">Cadastrar agora</button></div>
     <fieldset><legend>Cliente</legend>
-      <div id="m-cadastrado">${BUSCA_CLIENTE}</div><div id="m-novo" class="oculto">${CADASTRO}</div></fieldset>
+      <div id="m-cadastrado">${BUSCA_CLIENTE}${BLOCO_CEL}</div><div id="m-novo" class="oculto">${CADASTRO}</div></fieldset>
     <fieldset><legend>Talão</legend>${CAMPO("data", "Data de saída", "date")}</fieldset>
     ${PRODUTOS_HTML("Produtos")}
     <fieldset><legend>Débito anterior</legend>
@@ -433,9 +437,7 @@ function montarTexto() {
     return [`Total: ${reais(t)}`, "", ...pago, ...cob];
   };
   if (tipo === "venda") {
-    const cel = !val("v_cel") ? "Celular: não informado"
-      : celMudou() ? `Celular: ${formatarCel(val("v_cel"))} (novo — atualizar cadastro)` : `Celular: ${formatarCel(val("v_cel"))}`;
-    return ["🛒 FORMULÁRIO VENDA NOVA", "", `Cliente: ${nomeCliente()}`, cel, `Data da venda: ${br(val("data"))}`,
+    return ["🛒 FORMULÁRIO VENDA NOVA", "", `Cliente: ${nomeCliente()}`, ...(clienteEscolhido ? [linhaCel()] : []), `Data da venda: ${br(val("data"))}`,
       "Produtos (quantidade e preço):", ...linhasVenda(), ...fechamento(), ...obsLinha()].join("\n");
   }
   if (tipo === "cliente") {
@@ -445,7 +447,8 @@ function montarTexto() {
   const linhas = produtos().map(p => `${p.nome || "?"}: ${p.valor ? reais(num(p.valor)) : "R$"}`);
   const ant = val("ant_valor") ? reais(num(val("ant_valor"))) : "R$";
   const rec = val("rec_valor") ? reais(num(val("rec_valor"))) : "R$";
-  const cli = modoCliente === "novo" ? ["CLIENTE NOVO (cadastrar antes)", ...linhasCadastro()] : [`Cliente: ${nomeCliente()}`];
+  const cli = modoCliente === "novo" ? ["CLIENTE NOVO (cadastrar antes)", ...linhasCadastro()]
+    : [`Cliente: ${nomeCliente()}`, ...(clienteEscolhido ? [linhaCel()] : [])];
   return ["📒 FORMULÁRIO DÉBITOS ANTERIORES", "", ...cli, "", "COBRANÇA", "",
     `Data de saida: ${br(val("data")) || "//"}`, "Produtos:", ...linhas, "",
     `Débito anterior: ${ant} data: ${br(val("ant_data")) || "//"}`, "",
@@ -511,7 +514,7 @@ function conferir() {
     }
   } else {
     if (modoCliente === "novo" ? !val("c_nome") : !nomeCliente()) return "Falta o cliente.";
-    if (modoCliente === "novo" && celularRuim()) return CEL_ERRO;
+    if (modoCliente === "novo" ? celularRuim() : celularRuim("v_cel")) return CEL_ERRO;
     if (ps.some(p => !p.nome && p.busca)) return "Toque no produto na lista (ou em ✏️ Outro).";
     if (!(ps.some(p => num(p.valor) > 0) || num(val("ant_valor")) > 0)) return "Coloque algum valor (produto ou débito anterior).";
   }
