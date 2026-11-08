@@ -271,7 +271,7 @@ function melhorHorario() {
   const de = val("c_hora_de"), ate = val("c_hora_ate");
   return [de && `das ${de}`, ate && `às ${ate}`].filter(Boolean).join(" ");
 }
-const linhasCadastro = () => [`Nome: ${val("c_nome")}`, `Celular: ${val("c_cel") ? "+55 " + formatarCel(val("c_cel")) : ""}`, `Bairro: ${bairroTexto()}`,
+const linhasCadastro = () => [`Nome: ${val("c_nome")}`, `Celular: ${val("c_cel") ? "+55 " + formatarCel(val("c_cel")) + marcaFixo("c_cel") : ""}`, `Bairro: ${bairroTexto()}`,
   `Endereço: ${val("c_end")}`, `Referência: ${val("c_ref")}`, `CEP: ${val("c_cep")}`,
   `Melhor horário: ${melhorHorario()}`, `E-mail: ${val("c_email")}`];
 
@@ -396,7 +396,7 @@ const COBRANCA_HTML = `<fieldset id="fs-cobranca"><legend>Cobrança</legend>
 // Celular do cliente já cadastrado (08/11): Venda nova e Débitos › Já cadastrado
 const BLOCO_CEL = `<div id="bloco-cel" class="oculto">${CAMPO_CEL("v_cel", false)}<div class="dica" id="cel_dica"></div></div>`;
 const linhaCel = () => !val("v_cel") ? "Celular: não informado"
-  : celMudou() ? `Celular: +55 ${formatarCel(val("v_cel"))} (novo — atualizar cadastro)` : `Celular: +55 ${formatarCel(val("v_cel"))}`;
+  : celMudou() ? `Celular: +55 ${formatarCel(val("v_cel"))}${marcaFixo("v_cel")} (novo — atualizar cadastro)` : `Celular: +55 ${formatarCel(val("v_cel"))}${marcaFixo("v_cel")}`;
 const PRODUTOS_HTML = (titulo) => `<fieldset><legend>${titulo}</legend><div id="produtos"></div>
   <button type="button" class="add" id="add">+ produto</button><div class="total" id="total"></div></fieldset>`;
 const OBS = `<label for="obs">Observação</label><textarea id="obs"></textarea>`;
@@ -504,7 +504,7 @@ function pintarCel(id, saindo) {
   const inp = $("#" + id), campo = $("#" + id + "_campo"), caixa = $("#" + id + "_caixa"), msg = $("#" + id + "_msg");
   if (!inp) return;
   const e = erroCel(id);
-  campo.classList.toggle("cel-certo", !!inp.value && !e);
+  campo.classList.toggle("cel-certo", !!inp.value && !e && !ehFixo(id));
   if (saindo) {
     if (!e && inp.value) inp.value = formatarCel(inp.value);
     campo.classList.toggle("sem-ddd", ehSemDDD(e));                 // sem DDD: só "(com DDD)" em vermelho
@@ -536,13 +536,15 @@ function estadoCel() {
   if (!b) return;
   const vazio = !val("v_cel"), ruim = !vazio && celularRuim("v_cel");
   const semDDD = ruim && ehSemDDD(CEL_ERRO);   // 08/11: sem DDD = só o "(com DDD)" do rótulo em vermelho
-  b.className = semDDD ? "" : vazio || ruim ? "cel-falta" : "cel-ok";
+  const fixo = !vazio && !ruim && ehFixo("v_cel");
+  b.className = semDDD || fixo ? "" : vazio || ruim ? "cel-falta" : "cel-ok";
   $("#v_cel_campo").classList.toggle("sem-ddd", semDDD);
   $("#v_cel_caixa").classList.toggle("campo-ruim", ruim && !semDDD);
   d.textContent = vazio ? "⚠️ Cliente sem celular cadastrado: peça o número."
     : semDDD ? ""
     : ruim ? CEL_ERRO
     : celMudou() ? (celCadastro() ? "✏️ Número novo: vai atualizar o cadastro." : "✏️ Número novo: vai entrar no cadastro.")
+    : fixo ? "☎️ Número fixo: o bot vai confirmar se é de empresa com WhatsApp."
     : "✅ Celular cadastrado.";
 }
 
@@ -562,6 +564,11 @@ function ligarCep() {
   inp.addEventListener("blur", () => pintarCep(true));
   inp.addEventListener("input", () => pintarCep(false));
 }
+
+// 08/11 (Wellington): só fica verde com celular completo (DDD + 9 números). Fixo (DDD + 8) passa sem trava,
+// "WhatsApp" continua verde transparente e o bot pergunta se é mesmo fixo de empresa com WhatsApp.
+const ehFixo = id => digitosCel(val(id)).length === 10;
+const marcaFixo = id => ehFixo(id) ? " (fixo — confirmar)" : "";
 
 function conferirPagamento() {
   const t = totalVenda(), pg = num(val("pg_valor"));
