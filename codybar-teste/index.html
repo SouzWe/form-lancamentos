@@ -63,6 +63,7 @@
   .cel-certo .ddi input { border: 1px solid var(--ok); }
   .sem-ddd .lb-ddd { color: var(--erro); }
   .cel-fixo .lb-wpp { color: var(--fixo); }
+  .cel-ruim .lb-wpp { color: var(--erro); }   /* 08/11: número errado = "WhatsApp" vermelho, como as outras cores */
   .cel-fixo .ddi input { border: 1px solid var(--fixo); }
   #bloco-cel.cel-fixo .dica { color: var(--fixo); }
   /* 08/11 (Wellington): situação do cliente ao escolher o nome — deve = vermelho, não deve = verde */
@@ -523,11 +524,12 @@ function pintarCel(id, saindo) {
     if (!e && inp.value) inp.value = formatarCel(inp.value);
     campo.classList.toggle("sem-ddd", ehSemDDD(e));                 // sem DDD: só "(com DDD)" em vermelho
     caixa.classList.toggle("campo-ruim", !!e && !ehSemDDD(e));      // outro erro: borda vermelha + motivo
+    campo.classList.toggle("cel-ruim", !!e && !ehSemDDD(e));
     if (msg) msg.textContent = e && !ehSemDDD(e) ? e : "";
   } else if (!e) {                                                  // corrigindo: tira o vermelho assim que ficar certo
-    campo.classList.remove("sem-ddd"); caixa.classList.remove("campo-ruim"); if (msg) msg.textContent = "";
+    campo.classList.remove("sem-ddd", "cel-ruim"); caixa.classList.remove("campo-ruim"); if (msg) msg.textContent = "";
   } else if (digitosCel(inp.value).length > 11) {                  // 08/11: número a mais já fica vermelho ao digitar
-    caixa.classList.add("campo-ruim"); if (msg) msg.textContent = "Número com dígitos a mais.";
+    caixa.classList.add("campo-ruim"); campo.classList.add("cel-ruim"); if (msg) msg.textContent = "";
   }
 }
 function ligarCel(id) {
