@@ -291,7 +291,7 @@ function campoProduto() {
   if (!PRODUTOS.length) return `<input placeholder="Produto" data-k="nome">`;
   // Lista própria (06/11): a lista nativa (<select>) não abre no Telegram do computador.
   // Igual no celular e no PC: toca → abre a lista inteira; digitando, filtra.
-  return `<div class="pp"><input data-k="busca" placeholder="Produto… (toque ou digite)"><input type="hidden" data-k="sel"></div>`;
+  return `<div class="pp"><input data-k="busca" placeholder="Produto"><input type="hidden" data-k="sel"></div>`;
 }
 const rotuloProduto = p => p[1] + (p[2] ? ` (${p[2]})` : "");
 
