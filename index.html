@@ -14,6 +14,8 @@
     --btn: var(--tg-theme-button-color, #2a7de1);
     --btn-txt: var(--tg-theme-button-text-color, #ffffff);
     --erro: #d64545;
+    --ok: #2e9e5b;
+    --fixo: #f59e0b;   /* 08/11: fixo de empresa (DDD + 8) — amarelo quase laranja, para não confundir com o vermelho */
   }
   * { box-sizing: border-box; }
   body { margin: 0; padding: 16px 16px 96px; background: var(--bg); color: var(--txt);
@@ -24,6 +26,7 @@
   legend { font-weight: 600; font-size: 14px; text-transform: uppercase; letter-spacing: .03em;
            color: var(--dica); margin-bottom: 8px; padding: 0; }
   label { display: block; font-size: 14px; margin: 10px 0 4px; }
+  label[for=c_hora_de], label[for=c_hora_ate] { font-size: 12px; white-space: nowrap; }   /* 08/11: "Melhor horário da visita" cabe na linha (-2) */
   input, select, textarea { width: 100%; padding: 11px 12px; border: 1px solid transparent; border-radius: 10px;
          background: var(--campo); color: var(--txt); font: inherit; }
   input:focus, select:focus, textarea:focus { outline: none; border-color: var(--btn); }
@@ -32,6 +35,8 @@
   .linha.venda { grid-template-columns: 1fr 64px 92px 36px; }
   .linha.talao { grid-template-columns: 1fr 104px 36px; }
   .linha input, .linha select { padding: 10px; }
+  .linha { position: relative; }
+  .pp .achados { position: absolute; left: 0; right: 0; z-index: 5; box-shadow: 0 6px 18px rgba(0,0,0,.3); }
   .tirar { height: 42px; border: 0; border-radius: 10px; background: var(--campo); color: var(--erro); font-size: 20px; }
   .add { width: 100%; padding: 10px; border: 1px dashed var(--dica); border-radius: 10px; background: none;
          color: var(--btn); font: inherit; }
@@ -40,6 +45,42 @@
   .enviar { position: fixed; left: 16px; right: 16px; bottom: 16px; padding: 14px; border: 0; border-radius: 12px;
             background: var(--btn); color: var(--btn-txt); font: 600 17px/1 inherit; }
   .aviso { color: var(--erro); font-size: 14px; min-height: 20px; }
+  /* 08/11 (Wellington): erro ao enviar aparece no TOPO da tela (acima do teclado), em faixa vermelha */
+  .aviso:not(:empty) { position: fixed; left: 16px; right: 16px; top: 8px; z-index: 50; min-height: 0;
+    background: var(--erro); color: #fff; font-weight: 600; padding: 12px 14px; border-radius: 12px;
+    box-shadow: 0 6px 18px rgba(0,0,0,.35); }
+  /* 08/11: celular com +55 fixo na frente (número completo para a automação) */
+  .ddi { display: flex; gap: 6px; align-items: stretch; }
+  .ddi span { display: flex; align-items: center; padding: 0 10px; border-radius: 10px; background: var(--campo);
+    color: var(--dica); font-weight: 600; }
+  .ddi input { flex: 1; min-width: 0; }
+  .campo-ruim input { border: 1px solid var(--erro); }
+  .cel-msg { color: var(--erro); font-size: 13px; margin-top: 6px; }
+  .cel-msg:empty { display: none; }
+  /* 08/11: pergunta ao assistente no fim do formulário — botão próprio, não grava nada */
+  .perguntar { width: 100%; margin-top: 8px; padding: 12px; border: 1px solid var(--btn); border-radius: 10px;
+    background: none; color: var(--btn); font: 600 15px/1 inherit; }
+  /* 08/11 (Wellington): rótulo do WhatsApp — vazio = "WhatsApp" verde transparente; certo = "WhatsApp" + borda verdes;
+     sem DDD = só "(com DDD)" vermelho */
+  .lb-wpp { color: rgba(46, 158, 91, .55); }
+  .cel-certo .lb-wpp { color: var(--ok); }
+  .cel-certo .ddi input { border: 1px solid var(--ok); }
+  .sem-ddd .lb-ddd { color: var(--erro); }
+  .cel-fixo .lb-wpp { color: var(--fixo); }
+  .cel-ruim .lb-wpp, #bloco-cel.cel-falta .lb-wpp { color: var(--erro); }   /* vermelho = só "WhatsApp" + borda */   /* 08/11: número errado = "WhatsApp" vermelho, como as outras cores */
+  .cel-fixo .ddi input { border: 1px solid var(--fixo); }
+  #bloco-cel.cel-fixo .dica { color: var(--fixo); }
+  /* 08/11 (Wellington): situação do cliente ao escolher o nome — deve = vermelho, não deve = verde */
+  .situacao { font-size: 13px; margin-top: 16px; line-height: 1.5; }   /* 08/11: uma linha de espaço depois do celular */
+  #cel_dica { display: none; }   /* 08/11 (Wellington): menos informação — a cor do rótulo/borda do WhatsApp já mostra o estado */
+  .situacao .deve, .situacao .total { color: var(--dica); }     /* 08/11: texto cinza (cor das dicas)… */
+  .situacao .deve b, .situacao .total b { color: var(--erro); }  /* …só o valor em vermelho (igual ao "Falta R$ X") */
+  .situacao .total { text-align: left; margin-top: 2px; }
+  .situacao .limpo { color: var(--ok); font-weight: 600; }
+  .sem-ddd .ddi input { border: 1px solid var(--erro); }
+  /* 08/11: CEP — 8 números: certo = borda verde, errado = borda vermelha; vazio pode */
+  .cep-ok input { border: 1px solid var(--ok); }
+  .cep-ruim input { border: 1px solid var(--erro); }
   pre { white-space: pre-wrap; background: var(--campo); padding: 12px; border-radius: 10px; font-size: 13px; }
   .abas { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; background: var(--campo); padding: 4px;
           border-radius: 12px; margin-bottom: 14px; }
@@ -53,6 +94,19 @@
                border-radius: 10px; background: var(--campo); border: 1px solid var(--btn); }
   .escolhido button { border: 0; background: none; color: var(--erro); font-size: 18px; }
   .oculto { display: none; }
+  .dica { color: var(--dica); font-size: 13px; margin-top: 6px; }
+  /* 07/11: "Falta" em caixa igual ao Total; valor vermelho (saldo devedor), quitada em verde */
+  .dica.caixa { display: flex; justify-content: space-between; align-items: center; padding: 12px 14px;
+                border-radius: 10px; background: var(--campo); font-size: 14px; margin-top: 10px; }
+  .dica.deve { color: var(--txt); }      /* 07/11: frase em branco (cor do texto do tema) */
+  .dica.deve b { color: var(--erro); }   /* 07/11: frase simples (caixa recusada), só o valor em vermelho */
+  .dica.quitada { border: 1px solid var(--ok); color: var(--ok); font-weight: 600; }
+  .dica.excesso { color: var(--erro); }
+  /* 08/11 (Wellington): celular na Venda nova — verde = cadastrado, vermelho = atenção */
+  #bloco-cel.cel-ok input { border: 1px solid var(--ok); }
+  #bloco-cel.cel-ok .dica { color: var(--ok); }
+  #bloco-cel.cel-falta input { border: 1px solid var(--erro); }
+  #bloco-cel.cel-falta .dica { color: var(--erro); }
 </style>
 </head>
 <body>
@@ -99,35 +153,105 @@ const sem = t => (t || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase(
 
 const CAMPO = (id, rotulo, tipoInput = "text", extra = "") =>
   `<label for="${id}">${rotulo}</label><input id="${id}" type="${tipoInput}" ${extra}>`;
+// Celular/WhatsApp (08/11): +55 fixo na frente; digita só DDD + número. Fixo de empresa (DDD + 8) também vale.
+const CAMPO_CEL = (id, msg = true) => `<div class="campo-cel" id="${id}_campo">
+  <label for="${id}">Celular / <span class="lb-wpp">WhatsApp</span> (<span class="lb-ddd">com DDD</span>)</label>
+  <div class="ddi" id="${id}_caixa"><span>+55</span><input id="${id}" type="tel" inputmode="tel" placeholder="(11) 98586-7941"></div>
+  ${msg ? `<div class="cel-msg" id="${id}_msg"></div>` : ""}</div>`;
+
+// Horários de 30 em 30 min, 08:00–20:00 (05/11): lista, sem digitar símbolo.
+const HORAS = [];
+for (let m = 8 * 60; m <= 20 * 60; m += 30) HORAS.push(String(Math.floor(m / 60)).padStart(2, "0") + ":" + String(m % 60).padStart(2, "0"));
+const LISTA_HORA = (id, rotulo, vazio = "— (sem horário)") =>
+  `<label for="${id}">${rotulo}</label><select id="${id}"><option value="">${vazio}</option>${HORAS.map(h => `<option>${h}</option>`).join("")}</select>`;
+const HORA_COBRANCA = LISTA_HORA("cobranca_hora", "Horário da cobrança");
+const linhaHoraCobranca = () => val("cobranca_hora") ? [`Horário de cobrança: ${val("cobranca_hora")}`] : [];
+
+// ---------- lista acima do teclado (07/11, Wellington) ----------
+// Ao tocar no campo: a tela rola até o campo ficar no topo e a lista encolhe para caber
+// entre o campo e o teclado (rola dentro dela). Vale para cliente e produto.
+const alturaVisivel = () => Math.min(window.visualViewport ? visualViewport.height : innerHeight, innerHeight);
+function encaixar(input, lista) {
+  if (!matchMedia("(pointer: coarse)").matches) return;   // só no celular (no PC não há teclado na tela)
+  const ajustar = () => {
+    if (!input.isConnected || !lista.innerHTML) return;
+    const livre = alturaVisivel() - input.getBoundingClientRect().bottom - 12;
+    lista.style.maxHeight = Math.max(120, livre) + "px";
+  };
+  const subir = () => {
+    document.body.style.paddingBottom = "70vh";   // espaço para o campo conseguir subir até o topo
+    const y = input.getBoundingClientRect().top + scrollY - 12;
+    window.scrollTo({ top: y, behavior: "smooth" });
+    [150, 400, 800].forEach(ms => setTimeout(ajustar, ms));   // espera o teclado abrir
+  };
+  input.addEventListener("focus", subir);
+  input.addEventListener("input", ajustar);
+  input.addEventListener("blur", () => setTimeout(() => {
+    const a = document.activeElement;
+    if (!a || !a.matches || !a.matches("#busca, [data-k=busca], " + CAMPO_DIGITAR)) document.body.style.paddingBottom = "";
+  }, 200));
+  if (window.visualViewport) visualViewport.addEventListener("resize", ajustar);
+}
+
+// ---------- todo campo de digitar sobe acima do teclado (08/11, Wellington) ----------
+// Endereço, CEP, celular, obs etc.: ao tocar, a tela rola e o campo fica no topo (com o título dele visível).
+// Cliente/produto já sobem pelo encaixar(). Data, hora e listas de escolha abrem seletor próprio → não mexe.
+const CAMPO_DIGITAR = 'input:not([type=date]):not([type=time]):not([type=checkbox]):not([type=radio]), textarea';
+if (matchMedia("(pointer: coarse)").matches) {
+  document.addEventListener("focusin", e => {
+    const el = e.target;
+    if (!el.matches || !el.matches(CAMPO_DIGITAR) || el.matches("#busca, [data-k=busca]")) return;
+    document.body.style.paddingBottom = "70vh";
+    const subir = () => {
+      if (document.activeElement !== el) return;
+      const y = el.getBoundingClientRect().top + scrollY - 40;   // 40px = título do campo aparece
+      window.scrollTo({ top: y, behavior: "smooth" });
+    };
+    [50, 350].forEach(ms => setTimeout(subir, ms));   // de novo depois do teclado abrir
+  });
+  document.addEventListener("focusout", () => setTimeout(() => {
+    const a = document.activeElement;
+    if (!a || !a.matches || !a.matches(CAMPO_DIGITAR)) document.body.style.paddingBottom = "";
+  }, 200));
+}
 
 // ---------- cliente já cadastrado: busca por nome ----------
 let clienteEscolhido = null;
-const BUSCA_CLIENTE = `<label for="busca">Cliente</label><div id="caixa-cliente">
-  <input id="busca" placeholder="${CLIENTES.length ? "Digite as 3 primeiras letras do nome…" : "Nome do cliente"}"><div class="achados" id="achados"></div></div>`;
+const BUSCA_CLIENTE = `<div id="caixa-cliente">
+  <input id="busca" placeholder="${CLIENTES.length ? "Cliente… (toque ou digite)" : "Nome do cliente"}"><div class="achados" id="achados"></div></div>`;
 
 function ligarBusca() {
   const busca = $("#busca"), achados = $("#achados");
   if (!busca || !CLIENTES.length) return;
-  // A lista só aparece a partir de 3 letras (sem barra gigante); quem começa com o texto vem primeiro.
+  // 07/11 (Wellington): tocou no campo → abre a lista inteira (A–Z, rola para achar);
+  // digitando, filtra (quem começa com o texto vem primeiro).
   const mostrar = () => {
     const t = sem(busca.value.trim());
-    if (t.length < 3) { achados.innerHTML = ""; return; }
-    const lista = CLIENTES.filter(c => sem(c[1]).includes(t))
-      .sort((a, b) => sem(b[1]).startsWith(t) - sem(a[1]).startsWith(t)).slice(0, 10);
+    const lista = CLIENTES.filter(c => !t || sem(c[1]).includes(t))
+      .sort((a, b) => (t ? sem(b[1]).startsWith(t) - sem(a[1]).startsWith(t) : 0) || sem(a[1]).localeCompare(sem(b[1])));
     achados.innerHTML = lista
       .map(c => `<button type="button" data-id="${esc(c[0])}">${esc(c[1])} <small>${esc(c[2] || "sem bairro")}</small></button>`).join("")
       || `<button type="button" disabled><small>Ninguém com esse nome</small></button>`;
     achados.querySelectorAll("[data-id]").forEach(b => b.onclick = () => escolherCliente(CLIENTES.find(c => c[0] === b.dataset.id)));
   };
-  busca.oninput = mostrar;
+  busca.oninput = busca.onfocus = busca.onclick = mostrar;
+  encaixar(busca, achados);
+  document.addEventListener("click", e => { if (e.target.isConnected && $("#caixa-cliente") && !$("#caixa-cliente").contains(e.target)) achados.innerHTML = ""; });
 }
 function escolherCliente(c) {
   clienteEscolhido = c;
+  if ($("#bloco-cel")) {   // Venda nova: traz o celular do cadastro
+    $("#bloco-cel").classList.remove("oculto");
+    $("#v_cel").value = formatarCel(c[3] || "");
+    $("#v_cel").oninput = estadoCel; estadoCel(); pintarCel("v_cel", true);
+    mostrarSituacao(c);
+  }
   $("#caixa-cliente").innerHTML = `<div class="escolhido"><span>${esc(c[1])} <small>${esc(c[2] || "sem bairro")}</small></span>
     <button type="button" aria-label="Trocar">×</button></div>`;
   $("#caixa-cliente button").onclick = () => {
     clienteEscolhido = null;
-    $("#caixa-cliente").innerHTML = `<input id="busca" placeholder="Digite as 3 primeiras letras do nome…"><div class="achados" id="achados"></div>`;
+    if ($("#bloco-cel")) { $("#bloco-cel").classList.add("oculto"); $("#v_cel").value = ""; }
+    $("#caixa-cliente").innerHTML = `<input id="busca" placeholder="Cliente… (toque ou digite)"><div class="achados" id="achados"></div>`;
     ligarBusca(); $("#busca").focus();
   };
 }
@@ -137,14 +261,15 @@ const nomeCliente = () => clienteEscolhido ? `${clienteEscolhido[1]} (${clienteE
 const opsBairro = BAIRROS.map(b => `<option>${esc(b)}</option>`).join("");
 const CADASTRO = `
   ${CAMPO("c_nome", "Nome *")}
-  ${CAMPO("c_cel", "Celular", "tel")}
+  ${CAMPO_CEL("c_cel")}
   <label for="c_bairro">Bairro</label>
   <select id="c_bairro"><option value="">—</option>${opsBairro}<option value="${OUTRO}">Outros (escrever)</option></select>
   <input id="c_bairro_novo" class="oculto" placeholder="Nome do bairro novo" style="margin-top:8px">
   ${CAMPO("c_end", "Endereço")}
   ${CAMPO("c_ref", "Referência (ponto conhecido perto)")}
-  <div class="dupla"><div>${CAMPO("c_cep", "CEP", "text", 'inputmode="numeric"')}</div>
-    <div>${CAMPO("c_hora", "Melhor horário")}</div></div>
+  <div id="c_cep_campo">${CAMPO("c_cep", "CEP", "text", 'inputmode="numeric" placeholder="00000-000"')}</div>
+  <div class="dupla"><div>${LISTA_HORA("c_hora_de", "Melhor horário da visita: das", "—")}</div>
+    <div>${LISTA_HORA("c_hora_ate", "às", "—")}</div></div>
   ${CAMPO("c_email", "E-mail", "email")}`;
 
 function ligarCadastro() {
@@ -158,15 +283,55 @@ function bairroTexto() {
   if (sel === OUTRO) return val("c_bairro_novo") ? `${val("c_bairro_novo")} (novo)` : "";
   return sel;
 }
-const linhasCadastro = () => [`Nome: ${val("c_nome")}`, `Celular: ${val("c_cel")}`, `Bairro: ${bairroTexto()}`,
+// Melhor horário: "das 08:00 às 12:00" (só um lado preenchido também vale).
+function melhorHorario() {
+  const de = val("c_hora_de"), ate = val("c_hora_ate");
+  return [de && `das ${de}`, ate && `às ${ate}`].filter(Boolean).join(" ");
+}
+const linhasCadastro = () => [`Nome: ${val("c_nome")}`, `Celular: ${val("c_cel") ? "+55 " + formatarCel(val("c_cel")) + marcaFixo("c_cel") : ""}`, `Bairro: ${bairroTexto()}`,
   `Endereço: ${val("c_end")}`, `Referência: ${val("c_ref")}`, `CEP: ${val("c_cep")}`,
-  `Melhor horário: ${val("c_hora")}`, `E-mail: ${val("c_email")}`];
+  `Melhor horário: ${melhorHorario()}`, `E-mail: ${val("c_email")}`];
 
 // ---------- produtos ----------
 function campoProduto() {
   if (!PRODUTOS.length) return `<input placeholder="Produto" data-k="nome">`;
-  const ops = PRODUTOS.map((p, i) => `<option value="${i}">${esc(p[1])}${p[2] ? " (" + esc(p[2]) + ")" : ""}</option>`).join("");
-  return `<select data-k="sel"><option value="">Produto…</option><option value="${OUTRO}">✏️ Outro (não está na lista)</option>${ops}</select>`;
+  // Lista própria (06/11): a lista nativa (<select>) não abre no Telegram do computador.
+  // Igual no celular e no PC: toca → abre a lista inteira; digitando, filtra.
+  return `<div class="pp"><input data-k="busca" placeholder="Produto"><input type="hidden" data-k="sel"></div>`;
+}
+const rotuloProduto = p => p[1] + (p[2] ? ` (${p[2]})` : "");
+
+function ligarProduto(div) {
+  const pp = div.querySelector(".pp");
+  if (!pp) return;
+  const busca = pp.querySelector("[data-k=busca]"), sel = pp.querySelector("[data-k=sel]");
+  const lista = document.createElement("div");
+  lista.className = "achados"; pp.appendChild(lista);
+  const fechar = () => { lista.innerHTML = ""; };
+  const mostrar = () => {
+    const t = sem(busca.value.trim());
+    const itens = PRODUTOS.map((p, i) => [p, i]).filter(([p]) => !t || sem(p[1]).includes(t))
+      .sort((a, b) => t ? sem(b[0][1]).startsWith(t) - sem(a[0][1]).startsWith(t) : 0);
+    lista.innerHTML = `<button type="button" data-i="${OUTRO}">✏️ Outro (não está na lista)</button>`
+      + itens.map(([p, i]) => `<button type="button" data-i="${i}">${esc(p[1])}${p[2] ? ` <small>${esc(p[2])}</small>` : ""}</button>`).join("");
+    lista.querySelectorAll("[data-i]").forEach(b => b.onclick = () => escolher(b.dataset.i));
+  };
+  const escolher = i => {
+    fechar();
+    if (i === OUTRO) {   // troca a lista por campo livre nesta linha
+      const inp = document.createElement("input");
+      inp.placeholder = "Nome do produto"; inp.dataset.k = "nome"; inp.dataset.novo = "1"; inp.oninput = somar;
+      pp.replaceWith(inp); inp.focus(); return;
+    }
+    const p = PRODUTOS[i], preco = div.querySelector("[data-k=preco]");
+    sel.value = i; busca.value = rotuloProduto(p);
+    if (preco) { preco.value = String(p[3]).replace(".", ","); const q = div.querySelector("[data-k=qtd]"); if (!q.value) q.value = "1"; }
+    somar(); busca.blur();
+  };
+  busca.onfocus = busca.onclick = mostrar;
+  encaixar(busca, lista);
+  busca.oninput = () => { sel.value = ""; mostrar(); somar(); };
+  document.addEventListener("click", e => { if (!pp.contains(e.target)) fechar(); });
 }
 const comQtd = () => tipo !== "divida";
 
@@ -183,33 +348,51 @@ function linhaProduto() {
   }
   div.querySelector(".tirar").onclick = () => { div.remove(); somar(); };
   div.querySelectorAll("input").forEach(i => i.oninput = somar);
-  const sel = div.querySelector("[data-k=sel]");
-  if (sel) sel.onchange = () => {
-    if (sel.value === OUTRO) {   // troca a lista por campo livre nesta linha
-      const inp = document.createElement("input");
-      inp.placeholder = "Nome do produto"; inp.dataset.k = "nome"; inp.dataset.novo = "1"; inp.oninput = somar;
-      sel.replaceWith(inp); inp.focus(); return;
-    }
-    const p = PRODUTOS[sel.value], preco = div.querySelector("[data-k=preco]");
-    if (p && preco) { preco.value = String(p[3]).replace(".", ","); const q = div.querySelector("[data-k=qtd]"); if (!q.value) q.value = "1"; }
-    somar();
-  };
+  ligarProduto(div);
   $("#produtos").appendChild(div);
 }
 
 function produtos() {
   return [...document.querySelectorAll("#produtos .linha")].map(l => {
     const g = k => (l.querySelector(`[data-k=${k}]`)?.value || "").trim();
-    const p = PRODUTOS[g("sel")];
+    // Digitou e não tocou na lista: aceita se o texto bate com 1 produto só (06/11).
+    let p = PRODUTOS[g("sel")];
+    const t = sem(g("busca"));
+    if (!p && t) {
+      const ach = PRODUTOS.filter(x => sem(x[1]) === t || sem(rotuloProduto(x)) === t);
+      const parc = ach.length ? ach : PRODUTOS.filter(x => sem(x[1]).includes(t));
+      if (parc.length === 1) p = parc[0];
+    }
     const novo = !p && g("nome") && (PRODUTOS.length || l.querySelector("[data-novo]"));
-    return { nome: p ? `${p[1]} (${p[0]})` : g("nome") + (novo ? " (produto novo)" : ""), qtd: g("qtd"), preco: g("preco"), valor: g("valor"),
-             tabela: p ? Number(p[3]) : 0 };
-  }).filter(p => p.nome || p.qtd || p.preco || p.valor);
+    return { nome: p ? `${p[1]} (${p[0]})` : g("nome") + (novo ? " (produto novo)" : ""), qtd: g("qtd") || (p && comQtd() ? "1" : ""), preco: g("preco"), valor: g("valor"),
+             tabela: p ? Number(p[3]) : 0, busca: p ? "" : g("busca") };
+  }).filter(p => p.nome || p.busca || p.qtd || p.preco || p.valor);
 }
 
+const totalVenda = () => produtos().reduce((s, p) => s + (comQtd() ? num(p.qtd || 1) * num(p.preco) : num(p.valor)), 0)
+  + (tipo === "divida" ? num(val("ant_valor")) : 0);   // 08/11: no talão, o total soma o débito anterior
 function somar() {
-  const t = produtos().reduce((s, p) => s + (comQtd() ? num(p.qtd || 1) * num(p.preco) : num(p.valor)), 0);
-  $("#total").textContent = t > 0 ? "Total: " + reais(t) : "";
+  const t = totalVenda();
+  $("#total").textContent = t > 0 ? (tipo === "divida" ? "Total do talão: " : "Total: ") + reais(t) : "";   // 07/11: caixa testada e recusada, voltou o texto simples
+  pagamento();
+}
+
+// Venda nova (07/11, Wellington): sem valor pago = cobrança agendada → data obrigatória (horário opcional).
+// Pagou tudo → some a cobrança. Pagou parte → data do restante obrigatória.
+function pagamento() {
+  if (!$("#pg_valor")) return;
+  const t = Math.round(totalVenda() * 100) / 100, pg = num(val("pg_valor"));
+  if (tipo === "cliente") $("#bloco-compra").classList.toggle("oculto", !temCompra());   // 08/11: sem produto = só cadastro
+  const quitou = pg > 0 && t > 0 && pg >= t - 0.005;
+  $("#fs-cobranca").classList.toggle("oculto", quitou);
+  $("label[for=cobranca]").textContent = pg > 0 && !quitou ? "Data de cobrança do restante *" : "Data de cobrança *";
+  const d = $("#pg_dica"), excesso = pg > t + 0.005;
+  d.className = "dica" + (!pg ? "" : excesso ? " excesso" : quitou ? " caixa quitada" : " deve");
+  const tal = tipo === "divida";
+  d.innerHTML = !pg ? (tal ? "Não recebeu nada? Deixe em branco e marque a data da cobrança." : "Não pagou agora? Deixe em branco e marque a data da cobrança.")
+    : excesso ? (tal ? "Recebido maior que o total do talão." : "Pago maior que o total da venda.")
+    : quitou ? `<span>✅ ${tal ? "Talão quitado" : "Venda quitada"}</span><span>sem cobrança</span>`
+    : `Falta <b>${reais(t - pg)}</b> marque a data da cobrança do restante.`;
 }
 
 // Preço diferente da tabela = desconto/combinado: o texto avisa para o bot não trocar pelo de tabela.
@@ -220,6 +403,20 @@ const linhasVenda = () => produtos().map(p => {
   return `${p.qtd || "?"}x ${p.nome || "?"}${p.preco ? " " + reais(preco) : ""}${extra}`;
 });
 
+// Cliente novo: só conta como compra se tiver produto escolhido (linha vazia = só cadastro)
+const temCompra = () => produtos().some(p => p.nome || p.busca);
+// Pagamento + cobrança: mesmos da Venda nova (07/11) e da primeira compra do Cliente novo (08/11)
+const PAGAMENTO_HTML = `<fieldset><legend>Pagamento</legend>
+      <div class="dupla"><div>${CAMPO("pg_valor", "Pago agora R$", "text", 'inputmode="decimal" placeholder="0,00"')}</div>
+        <div><label for="pg_forma">Forma</label><select id="pg_forma"><option value="">—</option><option>dinheiro</option><option>pix</option><option>cartão</option></select></div></div>
+      <div class="dica" id="pg_dica">Não pagou agora? Deixe em branco e marque a data da cobrança.</div></fieldset>`;
+const COBRANCA_HTML = `<fieldset id="fs-cobranca"><legend>Cobrança</legend>
+      ${CAMPO("cobranca", "Data de cobrança *", "date")}${HORA_COBRANCA}</fieldset>`;
+// Celular do cliente já cadastrado (08/11): Venda nova e Débitos › Já cadastrado
+const BLOCO_CEL = `<div id="bloco-cel" class="oculto">${CAMPO_CEL("v_cel", false)}<div class="dica" id="cel_dica"></div>
+  <div class="situacao" id="situacao"></div></div>`;
+const linhaCel = () => !val("v_cel") ? "Celular: não informado"
+  : celMudou() ? `Celular: +55 ${formatarCel(val("v_cel"))}${marcaFixo("v_cel")} (novo — atualizar cadastro)` : `Celular: +55 ${formatarCel(val("v_cel"))}${marcaFixo("v_cel")}`;
 const PRODUTOS_HTML = (titulo) => `<fieldset><legend>${titulo}</legend><div id="produtos"></div>
   <button type="button" class="add" id="add">+ produto</button><div class="total" id="total"></div></fieldset>`;
 const OBS = `<label for="obs">Observação</label><textarea id="obs"></textarea>`;
@@ -232,35 +429,39 @@ if (tipo === "venda") {
   $("#titulo").textContent = "🛒 Venda nova";
   form.innerHTML = `
     <fieldset><legend>Cliente</legend>${BUSCA_CLIENTE}
+      ${BLOCO_CEL}
       ${CAMPO("data", "Data da venda", "date", `value="${hojeISO()}"`)}</fieldset>
     ${PRODUTOS_HTML("Produtos")}
-    <fieldset><legend>Cobrança</legend>
-      ${CAMPO("cobranca", "Data de cobrança (se já combinou)", "date")}${OBS}</fieldset>`;
+    ${PAGAMENTO_HTML}
+    ${COBRANCA_HTML}
+    <fieldset>${OBS}</fieldset>`;
 } else if (tipo === "cliente") {
   $("#titulo").textContent = "👤 Cliente novo";
   form.innerHTML = `
     <fieldset><legend>Cadastro</legend>${CADASTRO}${OBS}</fieldset>
     ${PRODUTOS_HTML("Primeira compra (se tiver)")}
-    <fieldset><legend>Cobrança</legend>${CAMPO("cobranca", "Data de cobrança (se já combinou)", "date")}</fieldset>`;
+    <div id="bloco-compra" class="oculto">
+      <fieldset><legend>Venda</legend>${CAMPO("data", "Data da venda", "date", `value="${hojeISO()}"`)}</fieldset>
+      ${PAGAMENTO_HTML}${COBRANCA_HTML}</div>`;
 } else {
   $("#titulo").textContent = "📒 Débito anterior (talão)";
   form.innerHTML = `
     <div class="abas"><button type="button" data-m="cadastrado" class="on">Já cadastrado</button>
       <button type="button" data-m="novo">Cadastrar agora</button></div>
     <fieldset><legend>Cliente</legend>
-      <div id="m-cadastrado">${BUSCA_CLIENTE}</div><div id="m-novo" class="oculto">${CADASTRO}</div></fieldset>
-    <fieldset><legend>Talão</legend>${CAMPO("data", "Data de saída", "date")}</fieldset>
+      <div id="m-cadastrado">${BUSCA_CLIENTE}${BLOCO_CEL}</div><div id="m-novo" class="oculto">${CADASTRO}</div></fieldset>
+    <fieldset><legend>Talão</legend>${CAMPO("data", "Saída / dia que vendeu os produtos", "date")}</fieldset>
     ${PRODUTOS_HTML("Produtos")}
     <fieldset><legend>Débito anterior</legend>
       <div class="dupla"><div>${CAMPO("ant_valor", "Valor R$", "text", 'inputmode="decimal"')}</div>
-        <div>${CAMPO("ant_data", "Data", "date")}</div></div></fieldset>
+        <div id="caixa-ant-data">${CAMPO("ant_data", "Data débito anterior", "date")}</div></div></fieldset>
     <fieldset><legend>Recebimento (se já pagou algo)</legend>
-      <div class="dupla"><div>${CAMPO("rec_data", "Data", "date")}</div>
-        <div>${CAMPO("rec_valor", "Recebeu R$", "text", 'inputmode="decimal"')}</div></div>
-      <label for="rec_forma">Forma de pagamento</label>
-      <select id="rec_forma"><option value="informar">informar</option><option>dinheiro</option><option>pix</option><option>cartão</option></select>
-    </fieldset>
-    <fieldset><legend>Cobrança</legend>${CAMPO("cobranca", "Data de cobrança do restante", "date")}${OBS}</fieldset>`;
+      <div class="dupla"><div>${CAMPO("pg_valor", "Recebeu R$", "text", 'inputmode="decimal" placeholder="0,00"')}</div>
+        <div><label for="pg_forma">Forma</label><select id="pg_forma"><option value="">—</option><option>dinheiro</option><option>pix</option><option>cartão</option></select></div></div>
+      <div id="caixa-rec-data">${CAMPO("rec_data", "Data do recebimento", "date")}</div>
+      <div class="dica" id="pg_dica">Não recebeu nada? Deixe em branco e marque a data da cobrança.</div></fieldset>
+    ${COBRANCA_HTML}
+    <fieldset>${OBS}</fieldset>`;
   document.querySelectorAll(".abas button").forEach(b => b.onclick = () => {
     modoCliente = b.dataset.m;
     document.querySelectorAll(".abas button").forEach(x => x.classList.toggle("on", x === b));
@@ -269,54 +470,234 @@ if (tipo === "venda") {
   });
 }
 $("#add").onclick = linhaProduto;
+if ($("#pg_valor")) $("#pg_valor").oninput = pagamento;
+if ($("#ant_valor")) $("#ant_valor").oninput = somar;   // 08/11: débito anterior entra no total do talão
+// 08/11 (Wellington): datas do débito anterior e do recebimento só aparecem quando o valor delas é preenchido;
+// a do recebimento vem em branco (o vendedor preenche o dia em que recebeu).
+function mostrarDatasTalao() {
+  if ($("#caixa-ant-data")) $("#caixa-ant-data").classList.toggle("oculto", !val("ant_valor"));
+  if ($("#caixa-rec-data")) $("#caixa-rec-data").classList.toggle("oculto", !val("pg_valor"));
+}
+// 08/11 (Wellington): voltou atrás — as 4 datas ficam sempre à mostra (a do recebimento continua vindo em branco)
+// 💬 Pergunta ao assistente (08/11)
+if (tipo !== "cliente") form.insertAdjacentHTML("beforeend", `<fieldset><legend>💬 Perguntar ao assistente</legend>
+  <textarea id="pergunta" placeholder="Ex.: quanto esse cliente comprou este mês? · quem tem cobrança vencida hoje?"></textarea>
+  <button type="button" class="perguntar" id="perguntar">Perguntar</button>
+  <div class="dica">Não grava nada. A resposta chega na conversa.</div></fieldset>`);
 linhaProduto();   // linha vazia é ignorada no envio (primeira compra do cliente novo é opcional)
-ligarBusca(); ligarCadastro();
+ligarBusca(); ligarCadastro(); ligarCel("c_cel"); ligarCel("v_cel"); ligarCep();
 
 // ---------- texto enviado ao bot ----------
 function montarTexto() {
+  // Total + pago na hora + cobrança: iguais na Venda nova e na 1ª compra do Cliente novo (08/11)
+  const fechamento = () => {
+    const t = totalVenda(), pg = num(val("pg_valor"));
+    const quitou = pg > 0 && pg >= t - 0.005;
+    const pago = pg > 0 ? [`Pago na hora: ${reais(pg)} (${val("pg_forma")})`] : ["Pago na hora: não"];
+    const cob = quitou ? ["Cobrança: não tem (venda quitada)"]
+      : [`${pg > 0 ? `Restante ${reais(t - pg)} · data` : "Data"} de cobrança: ${br(val("cobranca"))}`, ...linhaHoraCobranca()];
+    return [`Total: ${reais(t)}`, "", ...pago, ...cob];
+  };
   if (tipo === "venda") {
-    return ["🛒 FORMULÁRIO VENDA NOVA", "", `Cliente: ${nomeCliente()}`, `Data da venda: ${br(val("data"))}`,
-      "Produtos (quantidade e preço):", ...linhasVenda(), "", `Data de cobrança: ${br(val("cobranca"))}`, ...obsLinha()].join("\n");
+    return ["🛒 FORMULÁRIO VENDA NOVA", "", `Cliente: ${nomeCliente()}`, ...(clienteEscolhido ? [linhaCel()] : []), `Data da venda: ${br(val("data"))}`,
+      "Produtos (quantidade e preço):", ...linhasVenda(), ...fechamento(), ...obsLinha()].join("\n");
   }
   if (tipo === "cliente") {
-    const compra = linhasVenda();
     return ["👤 FORMULÁRIO CLIENTE NOVO", "", ...linhasCadastro(), ...obsLinha(),
-      ...(compra.length ? ["", "Primeira compra (quantidade e preço):", ...compra, "", `Data de cobrança: ${br(val("cobranca"))}`] : [])].join("\n");
+      ...(temCompra() ? ["", `Data da venda: ${br(val("data"))}`, "Primeira compra (quantidade e preço):", ...linhasVenda(), ...fechamento()] : [])].join("\n");
   }
   const linhas = produtos().map(p => `${p.nome || "?"}: ${p.valor ? reais(num(p.valor)) : "R$"}`);
   const ant = val("ant_valor") ? reais(num(val("ant_valor"))) : "R$";
-  const rec = val("rec_valor") ? reais(num(val("rec_valor"))) : "R$";
-  const cli = modoCliente === "novo" ? ["CLIENTE NOVO (cadastrar antes)", ...linhasCadastro()] : [`Cliente: ${nomeCliente()}`];
+  const t = totalVenda(), pg = num(val("pg_valor")), quitou = pg > 0 && pg >= t - 0.005;
+  const cli = modoCliente === "novo" ? ["CLIENTE NOVO (cadastrar antes)", ...linhasCadastro()]
+    : [`Cliente: ${nomeCliente()}`, ...(clienteEscolhido ? [linhaCel()] : [])];
   return ["📒 FORMULÁRIO DÉBITOS ANTERIORES", "", ...cli, "", "COBRANÇA", "",
     `Data de saida: ${br(val("data")) || "//"}`, "Produtos:", ...linhas, "",
     `Débito anterior: ${ant} data: ${br(val("ant_data")) || "//"}`, "",
-    "Data recebimento:", `data: ${br(val("rec_data")) || "//"} recebeu: ${rec} forma de pagamento: ${val("rec_forma")} falta: R$`, "",
-    `Data de cobrança: ${br(val("cobranca"))}`, ...obsLinha()].join("\n");
+    `Total do talão: ${reais(t)}`,
+    pg > 0 ? `Recebido: ${reais(pg)} (${val("pg_forma")}) em ${br(val("rec_data"))}` : "Recebido: não",
+    ...(quitou ? ["Cobrança: não tem (talão quitado)"]
+      : [`${pg > 0 ? `Restante ${reais(t - pg)} · data` : "Data"} de cobrança: ${br(val("cobranca"))}`, ...linhaHoraCobranca()]),
+    ...obsLinha()].join("\n");
+}
+
+// Celular (08/11): trava no formulário, igual à regra do motor (DDD + número = 10 ou 11 dígitos; +55 aceito)
+// Celular = DDD + 9 + 8 dígitos (11); fixo de empresa (WhatsApp Business) = DDD + 8 dígitos (10). +55 aceito.
+function erroCel(id) {
+  let d = val(id).replace(/\D/g, "");
+  if (!d) return "";   // celular é opcional
+  if (d.length > 11 && d.startsWith("55")) d = d.slice(2);
+  if (d.length === 8 || d.length === 9) return "Celular sem DDD: coloque o DDD antes, ex.: (11) 98586-7941.";
+  if (d.length === 11 && d[2] !== "9") return "Celular com 11 números precisa ter o 9 depois do DDD, ex.: (11) 98586-7941.";
+  if (d.length !== 10 && d.length !== 11) return "Número com quantidade errada: DDD + número (celular 11 dígitos, fixo 10).";
+  return "";
+}
+let CEL_ERRO = "";
+function celularRuim(id = "c_cel") { CEL_ERRO = erroCel(id); return !!CEL_ERRO; }
+// Ao sair do campo: vermelho + mensagem se estiver errado; certo = arruma a máscara (11) 98586-7941
+const ehSemDDD = e => e.startsWith("Celular sem DDD");
+function pintarCel(id, saindo) {
+  const inp = $("#" + id), campo = $("#" + id + "_campo"), caixa = $("#" + id + "_caixa"), msg = $("#" + id + "_msg");
+  if (!inp) return;
+  const e = erroCel(id);
+  campo.classList.toggle("cel-certo", !!inp.value && !e && !ehFixo(id));
+  campo.classList.toggle("cel-fixo", !!inp.value && !e && ehFixo(id));
+  if (saindo) {
+    if (!e && inp.value) inp.value = formatarCel(inp.value);
+    campo.classList.toggle("sem-ddd", ehSemDDD(e));                 // sem DDD: só "(com DDD)" em vermelho
+    caixa.classList.toggle("campo-ruim", !!e && !ehSemDDD(e));      // outro erro: "WhatsApp" + borda vermelhos
+    campo.classList.toggle("cel-ruim", !!e && !ehSemDDD(e));
+    if (msg) msg.textContent = "";                                   // 08/11: sem frase (o motivo aparece no topo ao enviar)
+  } else if (!e) {                                                  // corrigindo: tira o vermelho assim que ficar certo
+    campo.classList.remove("sem-ddd", "cel-ruim"); caixa.classList.remove("campo-ruim"); if (msg) msg.textContent = "";
+  } else if (digitosCel(inp.value).length > 11) {                  // 08/11: número a mais já fica vermelho ao digitar
+    caixa.classList.add("campo-ruim"); campo.classList.add("cel-ruim"); if (msg) msg.textContent = "";
+  }
+}
+function ligarCel(id) {
+  const inp = $("#" + id);
+  if (!inp) return;
+  inp.addEventListener("blur", () => { pintarCel(id, true); if (id === "v_cel") estadoCel(); });
+  inp.addEventListener("input", () => pintarCel(id, false));
+}
+
+const digitosCel = v => { let d = String(v || "").replace(/\D/g, ""); if (d.length > 11 && d.startsWith("55")) d = d.slice(2); return d; };
+function formatarCel(v) {
+  const d = digitosCel(v);
+  if (d.length === 11) return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`;
+  if (d.length === 10) return `(${d.slice(0, 2)}) ${d.slice(2, 6)}-${d.slice(6)}`;
+  return String(v || "");
+}
+// Venda nova (08/11): verde = celular do cadastro; vermelho = sem celular ou sem DDD; número diferente = atualiza o cadastro
+const celCadastro = () => clienteEscolhido ? digitosCel(clienteEscolhido[3]) : "";
+const celMudou = () => !!val("v_cel") && digitosCel(val("v_cel")) !== celCadastro();
+function estadoCel() {
+  const b = $("#bloco-cel"), d = $("#cel_dica");
+  if (!b) return;
+  const vazio = !val("v_cel"), ruim = !vazio && celularRuim("v_cel");
+  const semDDD = ruim && ehSemDDD(CEL_ERRO);   // 08/11: sem DDD = só o "(com DDD)" do rótulo em vermelho
+  const fixo = !vazio && !ruim && ehFixo("v_cel");
+  b.className = fixo ? "cel-fixo" : semDDD ? "" : vazio || ruim ? "cel-falta" : "cel-ok";
+  $("#v_cel_campo").classList.toggle("sem-ddd", semDDD);
+  $("#v_cel_caixa").classList.toggle("campo-ruim", ruim && !semDDD);
+  d.textContent = vazio ? "⚠️ Cliente sem celular cadastrado: peça o número."
+    : semDDD ? ""
+    : ruim ? CEL_ERRO
+    : celMudou() ? (celCadastro() ? "✏️ Número novo: vai atualizar o cadastro." : "✏️ Número novo: vai entrar no cadastro.")
+    : fixo ? "☎️ Número fixo: o bot vai confirmar se é de empresa com WhatsApp."
+    : "✅ Celular cadastrado.";
+}
+
+// CEP (08/11): 8 números. Vazio pode seguir. Ao sair do campo: certo = verde e máscara 00000-000; errado = vermelho.
+const cepRuim = () => { const d = val("c_cep").replace(/\D/g, ""); return !!d && d.length !== 8; };
+function pintarCep(saindo) {
+  const inp = $("#c_cep"), campo = $("#c_cep_campo");
+  if (!inp) return;
+  const d = inp.value.replace(/\D/g, ""), ok = d.length === 8;
+  if (saindo && ok) inp.value = d.slice(0, 5) + "-" + d.slice(5);
+  campo.classList.toggle("cep-ok", ok);
+  if (saindo || ok || !d) campo.classList.toggle("cep-ruim", !!d && !ok);
+}
+function ligarCep() {
+  const inp = $("#c_cep");
+  if (!inp) return;
+  inp.addEventListener("blur", () => pintarCep(true));
+  inp.addEventListener("input", () => pintarCep(false));
+}
+
+// 08/11 (Wellington): só fica verde com celular completo (DDD + 9 números). Fixo (DDD + 8) passa sem trava,
+// "WhatsApp" continua verde transparente e o bot pergunta se é mesmo fixo de empresa com WhatsApp.
+const ehFixo = id => digitosCel(val(id)).length === 10;
+const marcaFixo = id => ehFixo(id) ? " (fixo — confirmar)" : "";
+
+// Situação do cliente ao escolher o nome (08/11, ideia do Wellington). Vem no link dos botões:
+// c[4] = saldo do talão (débito anterior), c[5] = vendas em aberto, c[6] = "desde DD/MM" se a cobrança do talão venceu.
+// Os botões voltam depois de cada gravação, então o valor sai atualizado.
+function mostrarSituacao(c) {
+  const el = $("#situacao");
+  if (!el) return;
+  if (c.length < 6) { el.innerHTML = ""; return; }   // botões antigos, sem saldo
+  const talao = Number(c[4]) || 0, vendas = Number(c[5]) || 0;
+  if (talao <= 0 && vendas <= 0) { el.innerHTML = `<div class="limpo">✅ Não deve nada.</div>`; return; }
+  // 08/11 (Wellington): ordem = total (no topo, o que o vendedor precisa de imediato) → vendas → débito anterior (por último)
+  el.innerHTML = (talao > 0 && vendas > 0 ? `<div class="total">💸 Total que deve: <b>${reais(talao + vendas)}</b></div>` : "")
+    + (vendas > 0 ? `<div class="deve">🛒 Vendas em aberto: <b>${reais(vendas)}</b></div>` : "")
+    + (talao > 0 ? `<div class="deve">📒 Débito anterior (talão): <b>${reais(talao)}</b>${c[6] ? ` · ⚠️ vencida desde ${esc(c[6])}` : ""}</div>` : "");
+}
+
+function conferirPagamento() {
+  const t = totalVenda(), pg = num(val("pg_valor"));
+  if (val("pg_valor") && pg <= 0) return "Valor pago inválido.";
+  if (pg > t + 0.005) return tipo === "divida" ? "Recebido maior que o total do talão." : "Pago maior que o total da venda.";
+  if (tipo === "divida" && pg > 0 && !val("rec_data")) return "Falta a data do recebimento.";
+  if (pg > 0 && !val("pg_forma")) return "Escolha a forma do pagamento.";
+  if (!pg && val("pg_forma")) return "Coloque o valor pago (ou tire a forma).";
+  if (!(pg > 0 && pg >= t - 0.005) && !val("cobranca"))
+    return pg > 0 ? "Falta a data da cobrança do restante."
+      : tipo === "divida" ? "Sem recebimento: falta a data da cobrança." : "Sem pagamento agora: falta a data da cobrança.";
+  return "";
 }
 
 function conferir() {
   const ps = produtos();
   if (tipo === "venda") {
     if (!nomeCliente()) return "Escolha o cliente.";
+    if (celularRuim("v_cel")) return CEL_ERRO;
+    if (ps.some(p => !p.nome && p.busca)) return "Toque no produto na lista (ou em ✏️ Outro).";
     if (!ps.some(p => p.nome)) return "Coloque pelo menos um produto.";
+    return conferirPagamento();
   } else if (tipo === "cliente") {
     if (!val("c_nome")) return "Falta o nome do cliente.";
+    if (celularRuim()) return CEL_ERRO;
+    if (cepRuim()) return "CEP precisa ter 8 números (ex.: 08010-000).";
+    if (temCompra()) {   // 08/11: 1ª compra com as mesmas travas da Venda nova
+      if (ps.some(p => !p.nome && p.busca)) return "Toque no produto na lista (ou em ✏️ Outro).";
+      if (!val("data")) return "Falta a data da venda.";
+      return conferirPagamento();
+    }
   } else {
     if (modoCliente === "novo" ? !val("c_nome") : !nomeCliente()) return "Falta o cliente.";
+    if (modoCliente === "novo" ? celularRuim() : celularRuim("v_cel")) return CEL_ERRO;
+    if (modoCliente === "novo" && cepRuim()) return "CEP precisa ter 8 números (ex.: 08010-000).";
+    if (ps.some(p => !p.nome && p.busca)) return "Toque no produto na lista (ou em ✏️ Outro).";
     if (!(ps.some(p => num(p.valor) > 0) || num(val("ant_valor")) > 0)) return "Coloque algum valor (produto ou débito anterior).";
+    return conferirPagamento();   // 08/11: Recebeu + Forma, data do restante — igual à Venda nova
   }
   return "";
 }
 
-$("#enviar").onclick = () => {
-  const erro = conferir();
-  $("#aviso").textContent = erro;
-  if (erro) return;
-  const texto = montarTexto();
+// 08/11: o aviso de erro fica no topo da parte visível da tela (acima do teclado, se estiver aberto) e some ao corrigir
+let avisoTimer;
+function mostrarAviso(t) {
+  const a = $("#aviso");
+  a.textContent = t;
+  if (!t) return;
+  a.style.top = ((window.visualViewport ? visualViewport.offsetTop : 0) + 8) + "px";
+  clearTimeout(avisoTimer); avisoTimer = setTimeout(() => { a.textContent = ""; }, 6000);
+}
+document.addEventListener("input", () => { if ($("#aviso").textContent) $("#aviso").textContent = ""; });
+
+function entregar(texto) {
   // Aberto pelo botão do teclado o initData vem vazio; dentro do Telegram a plataforma não é "unknown".
   if (tg && tg.platform && tg.platform !== "unknown") { tg.sendData(texto); return; }   // fecha a janela e manda ao bot
   $("#saida").hidden = false; $("#saida").textContent = texto;  // fora do Telegram: só mostra
+}
+$("#enviar").onclick = () => {
+  const nadaLancado = !produtos().some(p => p.nome || p.busca) && !val("ant_valor") && !val("pg_valor");
+  if ($("#pergunta") && val("pergunta") && nadaLancado) { perguntar(); return; }
+  const erro = conferir();
+  mostrarAviso(erro);
+  if (erro) return;
+  entregar(montarTexto());
 };
+// 08/11 (Wellington): basta o cliente escolhido (os dados dele já aparecem); sem cliente, bloqueia.
+function perguntar() {
+  if (!clienteEscolhido) { mostrarAviso("Escolha o cliente para perguntar."); return; }
+  const p = val("pergunta");
+  if (!p) { mostrarAviso("Escreva a pergunta."); return; }
+  entregar(["💬 PERGUNTA AO ASSISTENTE", "", `Cliente: ${clienteEscolhido[1]} (${clienteEscolhido[0]})`, `Pergunta: ${p}`].join("\n"));
+}
+if ($("#perguntar")) $("#perguntar").onclick = perguntar;
 
 if (tg) { tg.ready(); tg.expand(); }
 }
