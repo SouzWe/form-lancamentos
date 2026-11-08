@@ -206,7 +206,7 @@ const nomeCliente = () => clienteEscolhido ? `${clienteEscolhido[1]} (${clienteE
 const opsBairro = BAIRROS.map(b => `<option>${esc(b)}</option>`).join("");
 const CADASTRO = `
   ${CAMPO("c_nome", "Nome *")}
-  ${CAMPO("c_cel", "Celular", "tel")}
+  ${CAMPO("c_cel", "Celular (com DDD)", "tel", 'placeholder="(11) 98586-7941"')}
   <label for="c_bairro">Bairro</label>
   <select id="c_bairro"><option value="">—</option>${opsBairro}<option value="${OUTRO}">Outros (escrever)</option></select>
   <input id="c_bairro_novo" class="oculto" placeholder="Nome do bairro novo" style="margin-top:8px">
@@ -439,6 +439,15 @@ function montarTexto() {
     `Data de cobrança: ${br(val("cobranca"))}`, ...linhaHoraCobranca(), ...obsLinha()].join("\n");
 }
 
+// Celular (08/11): trava no formulário, igual à regra do motor (DDD + número = 10 ou 11 dígitos; +55 aceito)
+const CEL_ERRO = "Celular sem DDD: coloque DDD + número (ex.: (11) 98586-7941).";
+function celularRuim() {
+  let d = val("c_cel").replace(/\D/g, "");
+  if (!d) return false;   // celular é opcional
+  if (d.length > 11 && d.startsWith("55")) d = d.slice(2);
+  return d.length !== 10 && d.length !== 11;
+}
+
 function conferirPagamento() {
   const t = totalVenda(), pg = num(val("pg_valor"));
   if (val("pg_valor") && pg <= 0) return "Valor pago inválido.";
@@ -459,12 +468,14 @@ function conferir() {
     return conferirPagamento();
   } else if (tipo === "cliente") {
     if (!val("c_nome")) return "Falta o nome do cliente.";
+    if (celularRuim()) return CEL_ERRO;
     if (temCompra()) {   // 08/11: 1ª compra com as mesmas travas da Venda nova
       if (ps.some(p => !p.nome && p.busca)) return "Toque no produto na lista (ou em ✏️ Outro).";
       return conferirPagamento();
     }
   } else {
     if (modoCliente === "novo" ? !val("c_nome") : !nomeCliente()) return "Falta o cliente.";
+    if (modoCliente === "novo" && celularRuim()) return CEL_ERRO;
     if (ps.some(p => !p.nome && p.busca)) return "Toque no produto na lista (ou em ✏️ Outro).";
     if (!(ps.some(p => num(p.valor) > 0) || num(val("ant_valor")) > 0)) return "Coloque algum valor (produto ou débito anterior).";
   }
