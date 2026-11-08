@@ -324,8 +324,9 @@ function somar() {
 // Venda nova (07/11, Wellington): sem valor pago = cobrança agendada → data obrigatória (horário opcional).
 // Pagou tudo → some a cobrança. Pagou parte → data do restante obrigatória.
 function pagamento() {
-  if (tipo !== "venda" || !$("#pg_valor")) return;
+  if (!$("#pg_valor")) return;
   const t = Math.round(totalVenda() * 100) / 100, pg = num(val("pg_valor"));
+  if (tipo === "cliente") $("#bloco-compra").classList.toggle("oculto", !temCompra());   // 08/11: sem produto = só cadastro
   const quitou = pg > 0 && t > 0 && pg >= t - 0.005;
   $("#fs-cobranca").classList.toggle("oculto", quitou);
   $("label[for=cobranca]").textContent = pg > 0 && !quitou ? "Data de cobrança do restante *" : "Data de cobrança *";
@@ -345,6 +346,15 @@ const linhasVenda = () => produtos().map(p => {
   return `${p.qtd || "?"}x ${p.nome || "?"}${p.preco ? " " + reais(preco) : ""}${extra}`;
 });
 
+// Cliente novo: só conta como compra se tiver produto escolhido (linha vazia = só cadastro)
+const temCompra = () => produtos().some(p => p.nome || p.busca);
+// Pagamento + cobrança: mesmos da Venda nova (07/11) e da primeira compra do Cliente novo (08/11)
+const PAGAMENTO_HTML = `<fieldset><legend>Pagamento</legend>
+      <div class="dupla"><div>${CAMPO("pg_valor", "Pago agora R$", "text", 'inputmode="decimal" placeholder="0,00"')}</div>
+        <div><label for="pg_forma">Forma</label><select id="pg_forma"><option value="">—</option><option>dinheiro</option><option>pix</option><option>cartão</option></select></div></div>
+      <div class="dica" id="pg_dica">Não pagou agora? Deixe em branco e marque a data da cobrança.</div></fieldset>`;
+const COBRANCA_HTML = `<fieldset id="fs-cobranca"><legend>Cobrança</legend>
+      ${CAMPO("cobranca", "Data de cobrança *", "date")}${HORA_COBRANCA}</fieldset>`;
 const PRODUTOS_HTML = (titulo) => `<fieldset><legend>${titulo}</legend><div id="produtos"></div>
   <button type="button" class="add" id="add">+ produto</button><div class="total" id="total"></div></fieldset>`;
 const OBS = `<label for="obs">Observação</label><textarea id="obs"></textarea>`;
@@ -359,19 +369,15 @@ if (tipo === "venda") {
     <fieldset><legend>Cliente</legend>${BUSCA_CLIENTE}
       ${CAMPO("data", "Data da venda", "date", `value="${hojeISO()}"`)}</fieldset>
     ${PRODUTOS_HTML("Produtos")}
-    <fieldset><legend>Pagamento</legend>
-      <div class="dupla"><div>${CAMPO("pg_valor", "Pago agora R$", "text", 'inputmode="decimal" placeholder="0,00"')}</div>
-        <div><label for="pg_forma">Forma</label><select id="pg_forma"><option value="">—</option><option>dinheiro</option><option>pix</option><option>cartão</option></select></div></div>
-      <div class="dica" id="pg_dica">Não pagou agora? Deixe em branco e marque a data da cobrança.</div></fieldset>
-    <fieldset id="fs-cobranca"><legend>Cobrança</legend>
-      ${CAMPO("cobranca", "Data de cobrança *", "date")}${HORA_COBRANCA}</fieldset>
+    ${PAGAMENTO_HTML}
+    ${COBRANCA_HTML}
     <fieldset>${OBS}</fieldset>`;
 } else if (tipo === "cliente") {
   $("#titulo").textContent = "👤 Cliente novo";
   form.innerHTML = `
     <fieldset><legend>Cadastro</legend>${CADASTRO}${OBS}</fieldset>
     ${PRODUTOS_HTML("Primeira compra (se tiver)")}
-    <fieldset><legend>Cobrança</legend>${CAMPO("cobranca", "Data de cobrança (se já combinou)", "date")}${HORA_COBRANCA}</fieldset>`;
+    <div id="bloco-compra" class="oculto">${PAGAMENTO_HTML}${COBRANCA_HTML}</div>`;
 } else {
   $("#titulo").textContent = "📒 Débito anterior (talão)";
   form.innerHTML = `
@@ -405,19 +411,22 @@ ligarBusca(); ligarCadastro();
 
 // ---------- texto enviado ao bot ----------
 function montarTexto() {
-  if (tipo === "venda") {
+  // Total + pago na hora + cobrança: iguais na Venda nova e na 1ª compra do Cliente novo (08/11)
+  const fechamento = () => {
     const t = totalVenda(), pg = num(val("pg_valor"));
     const quitou = pg > 0 && pg >= t - 0.005;
     const pago = pg > 0 ? [`Pago na hora: ${reais(pg)} (${val("pg_forma")})`] : ["Pago na hora: não"];
     const cob = quitou ? ["Cobrança: não tem (venda quitada)"]
       : [`${pg > 0 ? `Restante ${reais(t - pg)} · data` : "Data"} de cobrança: ${br(val("cobranca"))}`, ...linhaHoraCobranca()];
+    return [`Total: ${reais(t)}`, "", ...pago, ...cob];
+  };
+  if (tipo === "venda") {
     return ["🛒 FORMULÁRIO VENDA NOVA", "", `Cliente: ${nomeCliente()}`, `Data da venda: ${br(val("data"))}`,
-      "Produtos (quantidade e preço):", ...linhasVenda(), `Total: ${reais(t)}`, "", ...pago, ...cob, ...obsLinha()].join("\n");
+      "Produtos (quantidade e preço):", ...linhasVenda(), ...fechamento(), ...obsLinha()].join("\n");
   }
   if (tipo === "cliente") {
-    const compra = linhasVenda();
     return ["👤 FORMULÁRIO CLIENTE NOVO", "", ...linhasCadastro(), ...obsLinha(),
-      ...(compra.length ? ["", "Primeira compra (quantidade e preço):", ...compra, "", `Data de cobrança: ${br(val("cobranca"))}`, ...linhaHoraCobranca()] : [])].join("\n");
+      ...(temCompra() ? ["", "Primeira compra (quantidade e preço):", ...linhasVenda(), ...fechamento()] : [])].join("\n");
   }
   const linhas = produtos().map(p => `${p.nome || "?"}: ${p.valor ? reais(num(p.valor)) : "R$"}`);
   const ant = val("ant_valor") ? reais(num(val("ant_valor"))) : "R$";
@@ -430,21 +439,30 @@ function montarTexto() {
     `Data de cobrança: ${br(val("cobranca"))}`, ...linhaHoraCobranca(), ...obsLinha()].join("\n");
 }
 
+function conferirPagamento() {
+  const t = totalVenda(), pg = num(val("pg_valor"));
+  if (val("pg_valor") && pg <= 0) return "Valor pago inválido.";
+  if (pg > t + 0.005) return "Pago maior que o total da venda.";
+  if (pg > 0 && !val("pg_forma")) return "Escolha a forma do pagamento.";
+  if (!pg && val("pg_forma")) return "Coloque o valor pago (ou tire a forma).";
+  if (!(pg > 0 && pg >= t - 0.005) && !val("cobranca"))
+    return pg > 0 ? "Falta a data da cobrança do restante." : "Sem pagamento agora: falta a data da cobrança.";
+  return "";
+}
+
 function conferir() {
   const ps = produtos();
   if (tipo === "venda") {
     if (!nomeCliente()) return "Escolha o cliente.";
     if (ps.some(p => !p.nome && p.busca)) return "Toque no produto na lista (ou em ✏️ Outro).";
     if (!ps.some(p => p.nome)) return "Coloque pelo menos um produto.";
-    const t = totalVenda(), pg = num(val("pg_valor"));
-    if (val("pg_valor") && pg <= 0) return "Valor pago inválido.";
-    if (pg > t + 0.005) return "Pago maior que o total da venda.";
-    if (pg > 0 && !val("pg_forma")) return "Escolha a forma do pagamento.";
-    if (!pg && val("pg_forma")) return "Coloque o valor pago (ou tire a forma).";
-    if (!(pg > 0 && pg >= t - 0.005) && !val("cobranca"))
-      return pg > 0 ? "Falta a data da cobrança do restante." : "Sem pagamento agora: falta a data da cobrança.";
+    return conferirPagamento();
   } else if (tipo === "cliente") {
     if (!val("c_nome")) return "Falta o nome do cliente.";
+    if (temCompra()) {   // 08/11: 1ª compra com as mesmas travas da Venda nova
+      if (ps.some(p => !p.nome && p.busca)) return "Toque no produto na lista (ou em ✏️ Outro).";
+      return conferirPagamento();
+    }
   } else {
     if (modoCliente === "novo" ? !val("c_nome") : !nomeCliente()) return "Falta o cliente.";
     if (ps.some(p => !p.nome && p.busca)) return "Toque no produto na lista (ou em ✏️ Outro).";
