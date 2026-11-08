@@ -368,10 +368,11 @@ function produtos() {
   }).filter(p => p.nome || p.busca || p.qtd || p.preco || p.valor);
 }
 
-const totalVenda = () => produtos().reduce((s, p) => s + (comQtd() ? num(p.qtd || 1) * num(p.preco) : num(p.valor)), 0);
+const totalVenda = () => produtos().reduce((s, p) => s + (comQtd() ? num(p.qtd || 1) * num(p.preco) : num(p.valor)), 0)
+  + (tipo === "divida" ? num(val("ant_valor")) : 0);   // 08/11: no talão, o total soma o débito anterior
 function somar() {
   const t = totalVenda();
-  $("#total").textContent = t > 0 ? "Total: " + reais(t) : "";   // 07/11: caixa testada e recusada, voltou o texto simples
+  $("#total").textContent = t > 0 ? (tipo === "divida" ? "Total do talão: " : "Total: ") + reais(t) : "";   // 07/11: caixa testada e recusada, voltou o texto simples
   pagamento();
 }
 
@@ -386,9 +387,10 @@ function pagamento() {
   $("label[for=cobranca]").textContent = pg > 0 && !quitou ? "Data de cobrança do restante *" : "Data de cobrança *";
   const d = $("#pg_dica"), excesso = pg > t + 0.005;
   d.className = "dica" + (!pg ? "" : excesso ? " excesso" : quitou ? " caixa quitada" : " deve");
-  d.innerHTML = !pg ? "Não pagou agora? Deixe em branco e marque a data da cobrança."
-    : excesso ? "Pago maior que o total da venda."
-    : quitou ? "<span>✅ Venda quitada</span><span>sem cobrança</span>"
+  const tal = tipo === "divida";
+  d.innerHTML = !pg ? (tal ? "Não recebeu nada? Deixe em branco e marque a data da cobrança." : "Não pagou agora? Deixe em branco e marque a data da cobrança.")
+    : excesso ? (tal ? "Recebido maior que o total do talão." : "Pago maior que o total da venda.")
+    : quitou ? `<span>✅ ${tal ? "Talão quitado" : "Venda quitada"}</span><span>sem cobrança</span>`
     : `Falta <b>${reais(t - pg)}</b> marque a data da cobrança do restante.`;
 }
 
@@ -453,12 +455,12 @@ if (tipo === "venda") {
       <div class="dupla"><div>${CAMPO("ant_valor", "Valor R$", "text", 'inputmode="decimal"')}</div>
         <div>${CAMPO("ant_data", "Data", "date")}</div></div></fieldset>
     <fieldset><legend>Recebimento (se já pagou algo)</legend>
-      <div class="dupla"><div>${CAMPO("rec_data", "Data", "date")}</div>
-        <div>${CAMPO("rec_valor", "Recebeu R$", "text", 'inputmode="decimal"')}</div></div>
-      <label for="rec_forma">Forma de pagamento</label>
-      <select id="rec_forma"><option value="informar">informar</option><option>dinheiro</option><option>pix</option><option>cartão</option></select>
-    </fieldset>
-    <fieldset><legend>Cobrança</legend>${CAMPO("cobranca", "Data de cobrança do restante", "date")}${HORA_COBRANCA}${OBS}</fieldset>`;
+      <div class="dupla"><div>${CAMPO("pg_valor", "Recebeu R$", "text", 'inputmode="decimal" placeholder="0,00"')}</div>
+        <div><label for="pg_forma">Forma</label><select id="pg_forma"><option value="">—</option><option>dinheiro</option><option>pix</option><option>cartão</option></select></div></div>
+      ${CAMPO("rec_data", "Data do recebimento", "date", `value="${hojeISO()}"`)}
+      <div class="dica" id="pg_dica">Não recebeu nada? Deixe em branco e marque a data da cobrança.</div></fieldset>
+    ${COBRANCA_HTML}
+    <fieldset>${OBS}</fieldset>`;
   document.querySelectorAll(".abas button").forEach(b => b.onclick = () => {
     modoCliente = b.dataset.m;
     document.querySelectorAll(".abas button").forEach(x => x.classList.toggle("on", x === b));
@@ -468,6 +470,7 @@ if (tipo === "venda") {
 }
 $("#add").onclick = linhaProduto;
 if ($("#pg_valor")) $("#pg_valor").oninput = pagamento;
+if ($("#ant_valor")) $("#ant_valor").oninput = somar;   // 08/11: débito anterior entra no total do talão
 // 💬 Pergunta ao assistente (08/11, teste do Wellington — se não gostar, remover este bloco e o do botão)
 if (tipo !== "cliente") form.insertAdjacentHTML("beforeend", `<fieldset><legend>💬 Perguntar ao assistente</legend>
   <textarea id="pergunta" placeholder="Ex.: quanto esse cliente comprou este mês? · quem tem cobrança vencida hoje?"></textarea>
@@ -497,14 +500,17 @@ function montarTexto() {
   }
   const linhas = produtos().map(p => `${p.nome || "?"}: ${p.valor ? reais(num(p.valor)) : "R$"}`);
   const ant = val("ant_valor") ? reais(num(val("ant_valor"))) : "R$";
-  const rec = val("rec_valor") ? reais(num(val("rec_valor"))) : "R$";
+  const t = totalVenda(), pg = num(val("pg_valor")), quitou = pg > 0 && pg >= t - 0.005;
   const cli = modoCliente === "novo" ? ["CLIENTE NOVO (cadastrar antes)", ...linhasCadastro()]
     : [`Cliente: ${nomeCliente()}`, ...(clienteEscolhido ? [linhaCel()] : [])];
   return ["📒 FORMULÁRIO DÉBITOS ANTERIORES", "", ...cli, "", "COBRANÇA", "",
     `Data de saida: ${br(val("data")) || "//"}`, "Produtos:", ...linhas, "",
     `Débito anterior: ${ant} data: ${br(val("ant_data")) || "//"}`, "",
-    "Data recebimento:", `data: ${br(val("rec_data")) || "//"} recebeu: ${rec} forma de pagamento: ${val("rec_forma")} falta: R$`, "",
-    `Data de cobrança: ${br(val("cobranca"))}`, ...linhaHoraCobranca(), ...obsLinha()].join("\n");
+    `Total do talão: ${reais(t)}`,
+    pg > 0 ? `Recebido: ${reais(pg)} (${val("pg_forma")}) em ${br(val("rec_data"))}` : "Recebido: não",
+    ...(quitou ? ["Cobrança: não tem (talão quitado)"]
+      : [`${pg > 0 ? `Restante ${reais(t - pg)} · data` : "Data"} de cobrança: ${br(val("cobranca"))}`, ...linhaHoraCobranca()]),
+    ...obsLinha()].join("\n");
 }
 
 // Celular (08/11): trava no formulário, igual à regra do motor (DDD + número = 10 ou 11 dígitos; +55 aceito)
@@ -614,11 +620,13 @@ function mostrarSituacao(c) {
 function conferirPagamento() {
   const t = totalVenda(), pg = num(val("pg_valor"));
   if (val("pg_valor") && pg <= 0) return "Valor pago inválido.";
-  if (pg > t + 0.005) return "Pago maior que o total da venda.";
+  if (pg > t + 0.005) return tipo === "divida" ? "Recebido maior que o total do talão." : "Pago maior que o total da venda.";
+  if (tipo === "divida" && pg > 0 && !val("rec_data")) return "Falta a data do recebimento.";
   if (pg > 0 && !val("pg_forma")) return "Escolha a forma do pagamento.";
   if (!pg && val("pg_forma")) return "Coloque o valor pago (ou tire a forma).";
   if (!(pg > 0 && pg >= t - 0.005) && !val("cobranca"))
-    return pg > 0 ? "Falta a data da cobrança do restante." : "Sem pagamento agora: falta a data da cobrança.";
+    return pg > 0 ? "Falta a data da cobrança do restante."
+      : tipo === "divida" ? "Sem recebimento: falta a data da cobrança." : "Sem pagamento agora: falta a data da cobrança.";
   return "";
 }
 
@@ -645,6 +653,7 @@ function conferir() {
     if (modoCliente === "novo" && cepRuim()) return "CEP precisa ter 8 números (ex.: 08010-000).";
     if (ps.some(p => !p.nome && p.busca)) return "Toque no produto na lista (ou em ✏️ Outro).";
     if (!(ps.some(p => num(p.valor) > 0) || num(val("ant_valor")) > 0)) return "Coloque algum valor (produto ou débito anterior).";
+    return conferirPagamento();   // 08/11: Recebeu + Forma, data do restante — igual à Venda nova
   }
   return "";
 }
@@ -666,7 +675,7 @@ function entregar(texto) {
   $("#saida").hidden = false; $("#saida").textContent = texto;  // fora do Telegram: só mostra
 }
 $("#enviar").onclick = () => {
-  const nadaLancado = !produtos().some(p => p.nome || p.busca) && !val("ant_valor") && !val("pg_valor") && !val("rec_valor");
+  const nadaLancado = !produtos().some(p => p.nome || p.busca) && !val("ant_valor") && !val("pg_valor");
   if ($("#pergunta") && val("pergunta") && nadaLancado) { perguntar(); return; }
   const erro = conferir();
   mostrarAviso(erro);
