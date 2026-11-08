@@ -15,6 +15,7 @@
     --btn-txt: var(--tg-theme-button-text-color, #ffffff);
     --erro: #d64545;
     --ok: #2e9e5b;
+    --fixo: #f59e0b;   /* 08/11: fixo de empresa (DDD + 8) — amarelo quase laranja, para não confundir com o vermelho */
   }
   * { box-sizing: border-box; }
   body { margin: 0; padding: 16px 16px 96px; background: var(--bg); color: var(--txt);
@@ -61,6 +62,14 @@
   .cel-certo .lb-wpp { color: var(--ok); }
   .cel-certo .ddi input { border: 1px solid var(--ok); }
   .sem-ddd .lb-ddd { color: var(--erro); }
+  .cel-fixo .lb-wpp { color: var(--fixo); }
+  .cel-fixo .ddi input { border: 1px solid var(--fixo); }
+  #bloco-cel.cel-fixo .dica { color: var(--fixo); }
+  /* 08/11 (Wellington): situação do cliente ao escolher o nome — deve = vermelho, não deve = verde */
+  .situacao { font-size: 13px; margin-top: 8px; line-height: 1.5; }
+  .situacao .deve { color: var(--erro); }
+  .situacao .total { text-align: left; margin-top: 2px; color: var(--erro); }
+  .situacao .limpo { color: var(--ok); font-weight: 600; }
   .sem-ddd .ddi input { border: 1px solid var(--erro); }
   /* 08/11: CEP — 8 números: certo = borda verde, errado = borda vermelha; vazio pode */
   .cep-ok input { border: 1px solid var(--ok); }
@@ -228,6 +237,7 @@ function escolherCliente(c) {
     $("#bloco-cel").classList.remove("oculto");
     $("#v_cel").value = formatarCel(c[3] || "");
     $("#v_cel").oninput = estadoCel; estadoCel(); pintarCel("v_cel", true);
+    mostrarSituacao(c);
   }
   $("#caixa-cliente").innerHTML = `<div class="escolhido"><span>${esc(c[1])} <small>${esc(c[2] || "sem bairro")}</small></span>
     <button type="button" aria-label="Trocar">×</button></div>`;
@@ -394,7 +404,8 @@ const PAGAMENTO_HTML = `<fieldset><legend>Pagamento</legend>
 const COBRANCA_HTML = `<fieldset id="fs-cobranca"><legend>Cobrança</legend>
       ${CAMPO("cobranca", "Data de cobrança *", "date")}${HORA_COBRANCA}</fieldset>`;
 // Celular do cliente já cadastrado (08/11): Venda nova e Débitos › Já cadastrado
-const BLOCO_CEL = `<div id="bloco-cel" class="oculto">${CAMPO_CEL("v_cel", false)}<div class="dica" id="cel_dica"></div></div>`;
+const BLOCO_CEL = `<div id="bloco-cel" class="oculto">${CAMPO_CEL("v_cel", false)}<div class="dica" id="cel_dica"></div>
+  <div class="situacao" id="situacao"></div></div>`;
 const linhaCel = () => !val("v_cel") ? "Celular: não informado"
   : celMudou() ? `Celular: +55 ${formatarCel(val("v_cel"))}${marcaFixo("v_cel")} (novo — atualizar cadastro)` : `Celular: +55 ${formatarCel(val("v_cel"))}${marcaFixo("v_cel")}`;
 const PRODUTOS_HTML = (titulo) => `<fieldset><legend>${titulo}</legend><div id="produtos"></div>
@@ -505,6 +516,7 @@ function pintarCel(id, saindo) {
   if (!inp) return;
   const e = erroCel(id);
   campo.classList.toggle("cel-certo", !!inp.value && !e && !ehFixo(id));
+  campo.classList.toggle("cel-fixo", !!inp.value && !e && ehFixo(id));
   if (saindo) {
     if (!e && inp.value) inp.value = formatarCel(inp.value);
     campo.classList.toggle("sem-ddd", ehSemDDD(e));                 // sem DDD: só "(com DDD)" em vermelho
@@ -537,7 +549,7 @@ function estadoCel() {
   const vazio = !val("v_cel"), ruim = !vazio && celularRuim("v_cel");
   const semDDD = ruim && ehSemDDD(CEL_ERRO);   // 08/11: sem DDD = só o "(com DDD)" do rótulo em vermelho
   const fixo = !vazio && !ruim && ehFixo("v_cel");
-  b.className = semDDD || fixo ? "" : vazio || ruim ? "cel-falta" : "cel-ok";
+  b.className = fixo ? "cel-fixo" : semDDD ? "" : vazio || ruim ? "cel-falta" : "cel-ok";
   $("#v_cel_campo").classList.toggle("sem-ddd", semDDD);
   $("#v_cel_caixa").classList.toggle("campo-ruim", ruim && !semDDD);
   d.textContent = vazio ? "⚠️ Cliente sem celular cadastrado: peça o número."
@@ -569,6 +581,20 @@ function ligarCep() {
 // "WhatsApp" continua verde transparente e o bot pergunta se é mesmo fixo de empresa com WhatsApp.
 const ehFixo = id => digitosCel(val(id)).length === 10;
 const marcaFixo = id => ehFixo(id) ? " (fixo — confirmar)" : "";
+
+// Situação do cliente ao escolher o nome (08/11, ideia do Wellington). Vem no link dos botões:
+// c[4] = saldo do talão (débito anterior), c[5] = vendas em aberto, c[6] = "desde DD/MM" se a cobrança do talão venceu.
+// Os botões voltam depois de cada gravação, então o valor sai atualizado.
+function mostrarSituacao(c) {
+  const el = $("#situacao");
+  if (!el) return;
+  if (c.length < 6) { el.innerHTML = ""; return; }   // botões antigos, sem saldo
+  const talao = Number(c[4]) || 0, vendas = Number(c[5]) || 0;
+  if (talao <= 0 && vendas <= 0) { el.innerHTML = `<div class="limpo">✅ Não deve nada.</div>`; return; }
+  el.innerHTML = (talao > 0 ? `<div class="deve">📒 Débito anterior (talão): <b>${reais(talao)}</b>${c[6] ? ` · ⚠️ vencida desde ${esc(c[6])}` : ""}</div>` : "")
+    + (vendas > 0 ? `<div class="deve">🛒 Vendas em aberto: <b>${reais(vendas)}</b></div>` : "")
+    + (talao > 0 && vendas > 0 ? `<div class="total">Total que deve: <b>${reais(talao + vendas)}</b></div>` : "");
+}
 
 function conferirPagamento() {
   const t = totalVenda(), pg = num(val("pg_valor"));
