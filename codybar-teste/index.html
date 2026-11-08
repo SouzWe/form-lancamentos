@@ -56,6 +56,9 @@
   .campo-ruim input { border: 1px solid var(--erro); }
   .cel-msg { color: var(--erro); font-size: 13px; margin-top: 6px; }
   .cel-msg:empty { display: none; }
+  /* 08/11 (Wellington, teste): pergunta ao assistente no fim do formulário — botão próprio, não grava nada */
+  .perguntar { width: 100%; margin-top: 8px; padding: 12px; border: 1px solid var(--btn); border-radius: 10px;
+    background: none; color: var(--btn); font: 600 15px/1 inherit; }
   /* 08/11 (Wellington): rótulo do WhatsApp — vazio = "WhatsApp" verde transparente; certo = "WhatsApp" + borda verdes;
      sem DDD = só "(com DDD)" vermelho */
   .lb-wpp { color: rgba(46, 158, 91, .55); }
@@ -465,6 +468,11 @@ if (tipo === "venda") {
 }
 $("#add").onclick = linhaProduto;
 if ($("#pg_valor")) $("#pg_valor").oninput = pagamento;
+// 💬 Pergunta ao assistente (08/11, teste do Wellington — se não gostar, remover este bloco e o do botão)
+form.insertAdjacentHTML("beforeend", `<fieldset><legend>💬 Perguntar ao assistente</legend>
+  <textarea id="pergunta" placeholder="Ex.: quanto esse cliente comprou este mês? · quem tem cobrança vencida hoje?"></textarea>
+  <button type="button" class="perguntar" id="perguntar">Perguntar</button>
+  <div class="dica">Não grava nada. A resposta chega na conversa.</div></fieldset>`);
 linhaProduto();   // linha vazia é ignorada no envio (primeira compra do cliente novo é opcional)
 ligarBusca(); ligarCadastro(); ligarCel("c_cel"); ligarCel("v_cel"); ligarCep();
 
@@ -652,14 +660,23 @@ function mostrarAviso(t) {
 }
 document.addEventListener("input", () => { if ($("#aviso").textContent) $("#aviso").textContent = ""; });
 
+function entregar(texto) {
+  // Aberto pelo botão do teclado o initData vem vazio; dentro do Telegram a plataforma não é "unknown".
+  if (tg && tg.platform && tg.platform !== "unknown") { tg.sendData(texto); return; }   // fecha a janela e manda ao bot
+  $("#saida").hidden = false; $("#saida").textContent = texto;  // fora do Telegram: só mostra
+}
 $("#enviar").onclick = () => {
   const erro = conferir();
   mostrarAviso(erro);
   if (erro) return;
-  const texto = montarTexto();
-  // Aberto pelo botão do teclado o initData vem vazio; dentro do Telegram a plataforma não é "unknown".
-  if (tg && tg.platform && tg.platform !== "unknown") { tg.sendData(texto); return; }   // fecha a janela e manda ao bot
-  $("#saida").hidden = false; $("#saida").textContent = texto;  // fora do Telegram: só mostra
+  entregar(montarTexto());
+};
+$("#perguntar").onclick = () => {
+  const p = val("pergunta");
+  if (!p) { mostrarAviso("Escreva a pergunta."); return; }
+  const cli = clienteEscolhido ? [`Cliente: ${clienteEscolhido[1]} (${clienteEscolhido[0]})`]
+    : val("c_nome") ? [`Cliente (ainda não cadastrado): ${val("c_nome")}`] : [];
+  entregar(["💬 PERGUNTA AO ASSISTENTE", "", ...cli, `Pergunta: ${p}`].join("\n"));
 };
 
 if (tg) { tg.ready(); tg.expand(); }
