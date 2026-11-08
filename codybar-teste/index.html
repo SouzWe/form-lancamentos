@@ -64,6 +64,11 @@
   .dica.deve b { color: var(--erro); }   /* 07/11: frase simples (caixa recusada), só o valor em vermelho */
   .dica.quitada { border: 1px solid var(--ok); color: var(--ok); font-weight: 600; }
   .dica.excesso { color: var(--erro); }
+  /* 08/11 (Wellington): celular na Venda nova — verde = cadastrado, vermelho = atenção */
+  #bloco-cel.cel-ok input { border: 1px solid var(--ok); }
+  #bloco-cel.cel-ok .dica { color: var(--ok); }
+  #bloco-cel.cel-falta input { border: 1px solid var(--erro); }
+  #bloco-cel.cel-falta .dica { color: var(--erro); }
 </style>
 </head>
 <body>
@@ -192,10 +197,16 @@ function ligarBusca() {
 }
 function escolherCliente(c) {
   clienteEscolhido = c;
+  if ($("#bloco-cel")) {   // Venda nova: traz o celular do cadastro
+    $("#bloco-cel").classList.remove("oculto");
+    $("#v_cel").value = formatarCel(c[3] || "");
+    $("#v_cel").oninput = estadoCel; estadoCel();
+  }
   $("#caixa-cliente").innerHTML = `<div class="escolhido"><span>${esc(c[1])} <small>${esc(c[2] || "sem bairro")}</small></span>
     <button type="button" aria-label="Trocar">×</button></div>`;
   $("#caixa-cliente button").onclick = () => {
     clienteEscolhido = null;
+    if ($("#bloco-cel")) { $("#bloco-cel").classList.add("oculto"); $("#v_cel").value = ""; }
     $("#caixa-cliente").innerHTML = `<input id="busca" placeholder="Cliente… (toque ou digite)"><div class="achados" id="achados"></div>`;
     ligarBusca(); $("#busca").focus();
   };
@@ -367,6 +378,7 @@ if (tipo === "venda") {
   $("#titulo").textContent = "🛒 Venda nova";
   form.innerHTML = `
     <fieldset><legend>Cliente</legend>${BUSCA_CLIENTE}
+      <div id="bloco-cel" class="oculto">${CAMPO("v_cel", "Celular (com DDD)", "tel", 'placeholder="(11) 98586-7941"')}<div class="dica" id="cel_dica"></div></div>
       ${CAMPO("data", "Data da venda", "date", `value="${hojeISO()}"`)}</fieldset>
     ${PRODUTOS_HTML("Produtos")}
     ${PAGAMENTO_HTML}
@@ -421,7 +433,9 @@ function montarTexto() {
     return [`Total: ${reais(t)}`, "", ...pago, ...cob];
   };
   if (tipo === "venda") {
-    return ["🛒 FORMULÁRIO VENDA NOVA", "", `Cliente: ${nomeCliente()}`, `Data da venda: ${br(val("data"))}`,
+    const cel = !val("v_cel") ? "Celular: não informado"
+      : celMudou() ? `Celular: ${formatarCel(val("v_cel"))} (novo — atualizar cadastro)` : `Celular: ${formatarCel(val("v_cel"))}`;
+    return ["🛒 FORMULÁRIO VENDA NOVA", "", `Cliente: ${nomeCliente()}`, cel, `Data da venda: ${br(val("data"))}`,
       "Produtos (quantidade e preço):", ...linhasVenda(), ...fechamento(), ...obsLinha()].join("\n");
   }
   if (tipo === "cliente") {
@@ -441,11 +455,32 @@ function montarTexto() {
 
 // Celular (08/11): trava no formulário, igual à regra do motor (DDD + número = 10 ou 11 dígitos; +55 aceito)
 const CEL_ERRO = "Celular sem DDD: coloque DDD + número (ex.: (11) 98586-7941).";
-function celularRuim() {
-  let d = val("c_cel").replace(/\D/g, "");
+function celularRuim(id = "c_cel") {
+  let d = val(id).replace(/\D/g, "");
   if (!d) return false;   // celular é opcional
   if (d.length > 11 && d.startsWith("55")) d = d.slice(2);
   return d.length !== 10 && d.length !== 11;
+}
+
+const digitosCel = v => { let d = String(v || "").replace(/\D/g, ""); if (d.length > 11 && d.startsWith("55")) d = d.slice(2); return d; };
+function formatarCel(v) {
+  const d = digitosCel(v);
+  if (d.length === 11) return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`;
+  if (d.length === 10) return `(${d.slice(0, 2)}) ${d.slice(2, 6)}-${d.slice(6)}`;
+  return String(v || "");
+}
+// Venda nova (08/11): verde = celular do cadastro; vermelho = sem celular ou sem DDD; número diferente = atualiza o cadastro
+const celCadastro = () => clienteEscolhido ? digitosCel(clienteEscolhido[3]) : "";
+const celMudou = () => !!val("v_cel") && digitosCel(val("v_cel")) !== celCadastro();
+function estadoCel() {
+  const b = $("#bloco-cel"), d = $("#cel_dica");
+  if (!b) return;
+  const vazio = !val("v_cel"), ruim = !vazio && celularRuim("v_cel");
+  b.className = vazio || ruim ? "cel-falta" : "cel-ok";
+  d.textContent = vazio ? "⚠️ Cliente sem celular cadastrado: peça o número."
+    : ruim ? CEL_ERRO
+    : celMudou() ? (celCadastro() ? "✏️ Número novo: vai atualizar o cadastro." : "✏️ Número novo: vai entrar no cadastro.")
+    : "✅ Celular cadastrado.";
 }
 
 function conferirPagamento() {
@@ -463,6 +498,7 @@ function conferir() {
   const ps = produtos();
   if (tipo === "venda") {
     if (!nomeCliente()) return "Escolha o cliente.";
+    if (celularRuim("v_cel")) return CEL_ERRO;
     if (ps.some(p => !p.nome && p.busca)) return "Toque no produto na lista (ou em ✏️ Outro).";
     if (!ps.some(p => p.nome)) return "Coloque pelo menos um produto.";
     return conferirPagamento();
