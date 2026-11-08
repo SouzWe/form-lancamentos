@@ -591,9 +591,10 @@ function mostrarSituacao(c) {
   if (c.length < 6) { el.innerHTML = ""; return; }   // botões antigos, sem saldo
   const talao = Number(c[4]) || 0, vendas = Number(c[5]) || 0;
   if (talao <= 0 && vendas <= 0) { el.innerHTML = `<div class="limpo">✅ Não deve nada.</div>`; return; }
-  el.innerHTML = (talao > 0 ? `<div class="deve">📒 Débito anterior (talão): <b>${reais(talao)}</b>${c[6] ? ` · ⚠️ vencida desde ${esc(c[6])}` : ""}</div>` : "")
-    + (vendas > 0 ? `<div class="deve">🛒 Vendas em aberto: <b>${reais(vendas)}</b></div>` : "")
-    + (talao > 0 && vendas > 0 ? `<div class="total">Total que deve: <b>${reais(talao + vendas)}</b></div>` : "");
+  // 08/11 (Wellington): o total vem NO TOPO — é o que o vendedor precisa ver de imediato
+  el.innerHTML = (talao > 0 && vendas > 0 ? `<div class="total">Total que deve: <b>${reais(talao + vendas)}</b></div>` : "")
+    + (talao > 0 ? `<div class="deve">📒 Débito anterior (talão): <b>${reais(talao)}</b>${c[6] ? ` · ⚠️ vencida desde ${esc(c[6])}` : ""}</div>` : "")
+    + (vendas > 0 ? `<div class="deve">🛒 Vendas em aberto: <b>${reais(vendas)}</b></div>` : "");
 }
 
 function conferirPagamento() {
