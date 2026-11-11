@@ -450,11 +450,11 @@ if (tipo === "venda") {
       <button type="button" data-m="novo">Cadastrar agora</button></div>
     <fieldset><legend>Cliente</legend>
       <div id="m-cadastrado">${BUSCA_CLIENTE}${BLOCO_CEL}</div><div id="m-novo" class="oculto">${CADASTRO}</div></fieldset>
-    <fieldset><legend>Talão</legend>${CAMPO("data", "Saída / dia que vendeu os produtos", "date")}</fieldset>
     ${PRODUTOS_HTML("Produtos")}
     <fieldset><legend>Débito anterior</legend>
-      <div class="dupla"><div>${CAMPO("ant_valor", "Valor R$", "text", 'inputmode="decimal"')}</div>
-        <div id="caixa-ant-data">${CAMPO("ant_data", "Data débito anterior", "date")}</div></div></fieldset>
+      <div class="dupla"><div id="caixa-ant-data">${CAMPO("ant_data", "Data débito anterior", "date")}</div>
+        <div>${CAMPO("ant_valor", "Valor R$", "text", 'inputmode="decimal"')}</div></div>
+      ${CAMPO("data", "Saída / dia que vendeu os produtos", "date")}</fieldset>
     <fieldset><legend>Recebimento (se já pagou algo)</legend>
       <div class="dupla"><div>${CAMPO("pg_valor", "Recebeu R$", "text", 'inputmode="decimal" placeholder="0,00"')}</div>
         <div><label for="pg_forma">Forma</label><select id="pg_forma"><option value="">—</option><option>dinheiro</option><option>pix</option><option>cartão</option></select></div></div>
