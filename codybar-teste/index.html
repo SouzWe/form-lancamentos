@@ -48,6 +48,8 @@
          color: var(--btn); font: inherit; }
   .dupla { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
   .total { text-align: right; font-weight: 600; margin-top: 8px; }
+  .total .sub { font-weight: 400; color: var(--dica); }   /* 12/11 (I032): Subtotal e Desconto */
+  .desconto { margin-top: 8px; }
   .enviar { position: fixed; left: 16px; right: 16px; bottom: 16px; padding: 14px; border: 0; border-radius: 12px;
             background: var(--btn); color: var(--btn-txt); font: 600 17px/1 inherit; }
   .aviso { color: var(--erro); font-size: 14px; min-height: 20px; }
@@ -376,11 +378,20 @@ function produtos() {
   }).filter(p => p.nome || p.busca || p.qtd || p.preco || p.valor);
 }
 
-const totalVenda = () => produtos().reduce((s, p) => s + (comQtd() ? num(p.qtd || 1) * num(p.preco) : num(p.valor)), 0)
+const subtotalVenda = () => produtos().reduce((s, p) => s + (comQtd() ? num(p.qtd || 1) * num(p.preco) : num(p.valor)), 0)
   + (tipo === "divida" ? num(val("ant_valor")) : 0);   // 08/11: no talão, o total soma o débito anterior
+// 12/11 (I032): desconto % só no total (vazio/0 = sem desconto; 0,01 a 99,99). Os produtos ficam com o preço cheio.
+// "7,5" e "7.5" valem 7,5% (o num() tira o ponto de milhar, aqui não serve).
+const descPct = () => { const n = parseFloat(String(val("desc_pct") || "").replace(",", ".")); return isNaN(n) ? 0 : n; };
+const descOk = () => { const p = descPct(); return !val("desc_pct") || p === 0 || (p >= 0.01 && p <= 99.99); };
+const descValor = () => { const p = descPct(); return descOk() && p > 0 ? Math.round(subtotalVenda() * p + 1e-7) / 100 : 0; };
+const pctTxt = () => String(descPct()).replace(".", ",") + "%";
+const totalVenda = () => Math.round((subtotalVenda() - descValor()) * 100) / 100;   // total COM desconto (pago, restante, frases)
 function somar() {
-  const t = totalVenda();
-  $("#total").textContent = t > 0 ? (tipo === "divida" ? "Total do talão: " : "Total: ") + reais(t) : "";   // 07/11: caixa testada e recusada, voltou o texto simples
+  const s = subtotalVenda(), dv = descValor(), t = totalVenda();
+  const rot = tipo === "divida" ? "Total do talão: " : "Total: ";
+  $("#total").innerHTML = s <= 0 ? "" : !dv ? esc(rot + reais(t))   // 07/11: caixa testada e recusada, voltou o texto simples
+    : `<div class="sub">Subtotal: ${reais(s)}</div><div class="sub">Desconto: ${esc(pctTxt())} (− ${reais(dv)})</div><div>${esc(rot + reais(t))}</div>`;
   pagamento();
 }
 
@@ -428,7 +439,9 @@ const BLOCO_CEL = `<div id="bloco-cel" class="oculto">${CAMPO_CEL("v_cel", false
 const linhaCel = () => !val("v_cel") ? "Celular: não informado"
   : celMudou() ? `Celular: +55 ${formatarCel(val("v_cel"))}${marcaFixo("v_cel")} (novo — atualizar cadastro)` : `Celular: +55 ${formatarCel(val("v_cel"))}${marcaFixo("v_cel")}`;
 const PRODUTOS_HTML = (titulo) => `<fieldset><legend>${titulo}</legend><div id="produtos"></div>
-  <button type="button" class="add" id="add">+ produto</button><div class="total" id="total"></div></fieldset>`;
+  <button type="button" class="add" id="add">+ produto</button>
+  <div class="desconto">${CAMPO("desc_pct", "Desconto %", "text", 'inputmode="decimal" placeholder="0"')}</div>
+  <div class="total" id="total"></div></fieldset>`;
 const OBS = `<label for="obs">Observação</label><textarea id="obs"></textarea>`;
 const obsLinha = () => val("obs") ? ["", `Obs: ${val("obs")}`] : [];
 
@@ -483,6 +496,7 @@ if (tipo === "venda") {
 $("#add").onclick = linhaProduto;
 if ($("#pg_valor")) $("#pg_valor").oninput = pagamento;
 if ($("#ant_valor")) $("#ant_valor").oninput = somar;   // 08/11: débito anterior entra no total do talão
+if ($("#desc_pct")) $("#desc_pct").oninput = somar;     // 12/11 (I032): desconto % no total
 // 08/11 (Wellington): datas do débito anterior e do recebimento só aparecem quando o valor delas é preenchido;
 // a do recebimento vem em branco (o vendedor preenche o dia em que recebeu).
 function mostrarDatasTalao() {
@@ -508,6 +522,8 @@ new MutationObserver(marcarVazios).observe(document.body, { childList: true, sub
 marcarVazios();
 
 // ---------- texto enviado ao bot ----------
+// 12/11 (I032): só com desconto; sem desconto o texto fica igual a antes
+const linhasDesconto = () => descValor() ? [`Subtotal: ${reais(subtotalVenda())}`, `Desconto: ${pctTxt()} (− ${reais(descValor())})`] : [];
 function montarTexto() {
   // Total + pago na hora + cobrança: iguais na Venda nova e na 1ª compra do Cliente novo (08/11)
   const fechamento = () => {
@@ -516,7 +532,7 @@ function montarTexto() {
     const pago = pg > 0 ? [`Pago na hora: ${reais(pg)} (${val("pg_forma")})`] : ["Pago na hora: não"];
     const cob = quitou ? ["Cobrança: não tem (venda quitada)"]
       : [`${pg > 0 ? `Restante ${reais(t - pg)} · data` : "Data"} de cobrança: ${br(val("cobranca"))}`, ...linhaHoraCobranca()];
-    return [`Total: ${reais(t)}`, "", ...pago, ...cob];
+    return [...linhasDesconto(), `Total: ${reais(t)}`, "", ...pago, ...cob];
   };
   if (tipo === "venda") {
     return ["🛒 FORMULÁRIO VENDA NOVA", "", `Cliente: ${nomeCliente()}`, ...(clienteEscolhido ? [linhaCel()] : []), `Data da venda: ${br(val("data"))}`,
@@ -534,7 +550,7 @@ function montarTexto() {
   return ["📒 FORMULÁRIO DÉBITOS ANTERIORES", "", ...cli, "", "COBRANÇA", "",
     `Data de saida: ${br(val("ant_data")) || "//"}`, "Produtos:", ...linhas, "",   // 12/11: data única = Data débito anterior
     `Débito anterior: ${ant} data: ${br(val("ant_data")) || "//"}`, "",
-    `Total do talão: ${reais(t)}`,
+    ...linhasDesconto(), `Total do talão: ${reais(t)}`,
     pg > 0 ? `Recebido: ${reais(pg)} (${val("pg_forma")}) em ${br(val("rec_data"))}` : "Recebido: não",
     ...(quitou ? ["Cobrança: não tem (talão quitado)"]
       : [`${pg > 0 ? `Restante ${reais(t - pg)} · data` : "Data"} de cobrança: ${br(val("cobranca"))}`, ...linhaHoraCobranca()]),
@@ -652,6 +668,7 @@ function mostrarSituacao(c) {
 }
 
 function conferirPagamento() {
+  if (!descOk()) return "Desconto precisa ser de 0,01% a 99,99% (ou deixe em branco).";
   const t = totalVenda(), pg = num(val("pg_valor"));
   if (val("pg_valor") && pg <= 0) return "Valor pago inválido.";
   if (pg > t + 0.005) return tipo === "divida" ? "Recebido maior que o total do talão." : "Pago maior que o total da venda.";
