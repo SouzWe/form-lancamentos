@@ -83,6 +83,7 @@
   .situacao .deve b, .situacao .total b { color: var(--erro); }  /* …só o valor em vermelho (igual ao "Falta R$ X") */
   .situacao .total { text-align: left; margin-top: 2px; }
   .situacao .limpo { color: var(--ok); font-weight: 600; }
+  .situacao .rot { color: var(--dica); margin-top: 6px; }   /* 09/11: rótulo "Débitos em aberto:" / "Débito anterior:" */
   .sem-ddd .ddi input { border: 1px solid var(--erro); }
   /* 08/11: CEP — 8 números: certo = borda verde, errado = borda vermelha; vazio pode */
   .cep-ok input { border: 1px solid var(--ok); }
@@ -630,18 +631,24 @@ const ehFixo = id => digitosCel(val(id)).length === 10;
 const marcaFixo = id => ehFixo(id) ? " (fixo — confirmar)" : "";
 
 // Situação do cliente ao escolher o nome (08/11, ideia do Wellington). Vem no link dos botões:
-// c[4] = saldo do talão (débito anterior), c[5] = vendas em aberto, c[6] = "desde DD/MM" se a cobrança do talão venceu.
+// c[4] = saldo do talão (débito anterior), c[5] = débitos em aberto (vendas a prazo não pagas),
+// c[6] = "DD/MM/AAAA" se a cobrança do talão venceu, c[7] (09/11) = data de cobrança do talão ("" = sem data).
+// 09/11 (Wellington) — padrão do "quanto deve": 💸 saldo devedor total SEMPRE no topo quando houver qualquer dívida
+// → Débitos em aberto (🛒) → Débito anterior (📒 talão). Linha zerada some. Nunca "Vendas em aberto".
 // Os botões voltam depois de cada gravação, então o valor sai atualizado.
 function mostrarSituacao(c) {
   const el = $("#situacao");
   if (!el) return;
   if (c.length < 6) { el.innerHTML = ""; return; }   // botões antigos, sem saldo
-  const talao = Number(c[4]) || 0, vendas = Number(c[5]) || 0;
-  if (talao <= 0 && vendas <= 0) { el.innerHTML = `<div class="limpo">✅ Não deve nada.</div>`; return; }
-  // 08/11 (Wellington): ordem = total (no topo, o que o vendedor precisa de imediato) → vendas → débito anterior (por último)
-  el.innerHTML = (talao > 0 && vendas > 0 ? `<div class="total">💸 Total que deve: <b>${reais(talao + vendas)}</b></div>` : "")
-    + (vendas > 0 ? `<div class="deve">🛒 Vendas em aberto: <b>${reais(vendas)}</b></div>` : "")
-    + (talao > 0 ? `<div class="deve">📒 Débito anterior (talão): <b>${reais(talao)}</b>${c[6] ? ` · ⚠️ vencida desde ${esc(c[6])}` : ""}</div>` : "");
+  const talao = Number(c[4]) || 0, aberto = Number(c[5]) || 0;
+  if (talao <= 0 && aberto <= 0) { el.innerHTML = `<div class="limpo">Não deve nada ✅</div>`; return; }
+  const dm = d => esc(String(d).slice(0, 5));   // DD/MM/AAAA → DD/MM
+  const dataTalao = c[6] ? ` · ⚠️ vencida desde ${dm(c[6])}`
+    : c.length < 8 ? ""                                        // botões de antes de 09/11: sem a data
+    : c[7] ? ` · cobrança ${dm(c[7])}` : " · não tem data de cobrança";
+  el.innerHTML = `<div class="total">💸 Saldo devedor total: <b>${reais(talao + aberto)}</b></div>`
+    + (aberto > 0 ? `<div class="rot">Débitos em aberto:</div><div class="deve">🛒 <b>${reais(aberto)}</b></div>` : "")
+    + (talao > 0 ? `<div class="rot">Débito anterior:</div><div class="deve">📒 (talão): <b>${reais(talao)}</b>${dataTalao}</div>` : "");
 }
 
 function conferirPagamento() {
