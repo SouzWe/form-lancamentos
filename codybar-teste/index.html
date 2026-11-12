@@ -452,16 +452,17 @@ if (tipo === "venda") {
       <button type="button" data-m="novo">Cadastrar agora</button></div>
     <fieldset><legend>Cliente</legend>
       <div id="m-cadastrado">${BUSCA_CLIENTE}${BLOCO_CEL}</div><div id="m-novo" class="oculto">${CADASTRO}</div></fieldset>
-    ${PRODUTOS_HTML("Produtos")}
     <fieldset><legend>Débito anterior</legend>
-      <div class="dupla"><div id="caixa-ant-data">${CAMPO("ant_data", "Data débito anterior", "date")}</div>
-        <div>${CAMPO("ant_valor", "Valor R$", "text", 'inputmode="decimal"')}</div></div>
-      ${CAMPO("data", "Saída / dia que vendeu os produtos", "date")}</fieldset>
+      <div class="dupla"><div>${CAMPO("ant_valor", "Valor R$", "text", 'inputmode="decimal"')}</div>
+        <div id="caixa-ant-data">${CAMPO("ant_data", "Data débito anterior", "date")}</div></div></fieldset>
     <fieldset><legend>Recebimento (se já pagou algo)</legend>
       <div class="dupla"><div>${CAMPO("pg_valor", "Recebeu R$", "text", 'inputmode="decimal" placeholder="0,00"')}</div>
-        <div><label for="pg_forma">Forma</label><select id="pg_forma"><option value="">—</option><option>dinheiro</option><option>pix</option><option>cartão</option></select></div></div>
-      <div id="caixa-rec-data">${CAMPO("rec_data", "Data do recebimento", "date")}</div></fieldset>
-    ${COBRANCA_HTML}
+        <div id="caixa-rec-data">${CAMPO("rec_data", "Data do recebimento", "date")}</div></div>
+      <label for="pg_forma">Forma</label><select id="pg_forma"><option value="">—</option><option>dinheiro</option><option>pix</option><option>cartão</option></select></fieldset>
+    ${PRODUTOS_HTML("Produtos")}
+    <fieldset id="fs-cobranca"><legend>Cobrança</legend>
+      <div class="dupla"><div>${CAMPO("cobranca", "Data de cobrança *", "date")}</div><div>${HORA_COBRANCA}</div></div>
+      <div class="dica" id="pg_dica">Não recebeu nada? Deixe em branco e marque a data da cobrança.</div></fieldset>
     <fieldset>${OBS}</fieldset>`;
   document.querySelectorAll(".abas button").forEach(b => b.onclick = () => {
     modoCliente = b.dataset.m;
@@ -470,9 +471,7 @@ if (tipo === "venda") {
     $("#m-novo").classList.toggle("oculto", modoCliente !== "novo");
   });
 }
-// 11/11 (Wellington): no Débitos a frase do recebimento fica na COBRANÇA, logo abaixo da data
-if (tipo === "divida") $("#cobranca").insertAdjacentHTML("afterend",
-  `<div class="dica" id="pg_dica">Não recebeu nada? Deixe em branco e marque a data da cobrança.</div>`);
+// 12/11 (Wellington): no Débitos a COBRANÇA é própria (data | horário lado a lado, frase embaixo) — ver template acima
 $("#add").onclick = linhaProduto;
 if ($("#pg_valor")) $("#pg_valor").oninput = pagamento;
 if ($("#ant_valor")) $("#ant_valor").oninput = somar;   // 08/11: débito anterior entra no total do talão
@@ -484,7 +483,8 @@ function mostrarDatasTalao() {
 }
 // 08/11 (Wellington): voltou atrás — as 4 datas ficam sempre à mostra (a do recebimento continua vindo em branco)
 // 💬 Pergunta ao assistente (08/11, teste do Wellington — se não gostar, remover este bloco e o do botão)
-if (tipo !== "cliente") form.insertAdjacentHTML("beforeend", `<fieldset><legend>💬 Perguntar ao assistente</legend>
+// 12/11 (Wellington): saiu do Débitos — fica só na Venda nova
+if (tipo === "venda") form.insertAdjacentHTML("beforeend", `<fieldset><legend>💬 Perguntar ao assistente</legend>
   <textarea id="pergunta" placeholder="Ex.: quanto esse cliente comprou este mês? · quem tem cobrança vencida hoje?"></textarea>
   <button type="button" class="perguntar" id="perguntar">Perguntar</button>
   <div class="dica">Não grava nada. A resposta chega na conversa.</div></fieldset>`);
@@ -516,7 +516,7 @@ function montarTexto() {
   const cli = modoCliente === "novo" ? ["CLIENTE NOVO (cadastrar antes)", ...linhasCadastro()]
     : [`Cliente: ${nomeCliente()}`, ...(clienteEscolhido ? [linhaCel()] : [])];
   return ["📒 FORMULÁRIO DÉBITOS ANTERIORES", "", ...cli, "", "COBRANÇA", "",
-    `Data de saida: ${br(val("data")) || "//"}`, "Produtos:", ...linhas, "",
+    `Data de saida: ${br(val("ant_data")) || "//"}`, "Produtos:", ...linhas, "",   // 12/11: data única = Data débito anterior
     `Débito anterior: ${ant} data: ${br(val("ant_data")) || "//"}`, "",
     `Total do talão: ${reais(t)}`,
     pg > 0 ? `Recebido: ${reais(pg)} (${val("pg_forma")}) em ${br(val("rec_data"))}` : "Recebido: não",
