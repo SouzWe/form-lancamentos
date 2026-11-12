@@ -15,7 +15,8 @@
     --btn-txt: var(--tg-theme-button-text-color, #ffffff);
     --erro: #d64545;
     --ok: #2e9e5b;
-    --vazio: darkgray;   /* 12/11: cinza do exemplo dentro dos campos (o mesmo que o navegador já usava) */
+    --vazio-alfa: .5;    /* 12/11 (Wellington): opacidade do texto de dentro dos campos — ajustar só este número (1 = sólido, 0 = invisível) */
+    --vazio: rgba(169, 169, 169, var(--vazio-alfa));   /* cinza (darkgray) do exemplo e dos campos vazios */
     --fixo: #f59e0b;   /* 08/11: fixo de empresa (DDD + 8) — amarelo quase laranja, para não confundir com o vermelho */
   }
   * { box-sizing: border-box; }
@@ -161,7 +162,7 @@ const CAMPO = (id, rotulo, tipoInput = "text", extra = "") =>
 // Celular/WhatsApp (08/11): +55 fixo na frente; digita só DDD + número. Fixo de empresa (DDD + 8) também vale.
 const CAMPO_CEL = (id, msg = true) => `<div class="campo-cel" id="${id}_campo">
   <label for="${id}">Celular / <span class="lb-wpp">WhatsApp</span> (<span class="lb-ddd">com DDD</span>)</label>
-  <div class="ddi" id="${id}_caixa"><span>+55</span><input id="${id}" type="tel" inputmode="tel" placeholder="(11) 98586-7941"></div>
+  <div class="ddi" id="${id}_caixa"><span>+55</span><input id="${id}" type="tel" inputmode="tel" placeholder="(00) 00000-0000"></div>
   ${msg ? `<div class="cel-msg" id="${id}_msg"></div>` : ""}</div>`;
 
 // Horários de 30 em 30 min, 08:00–20:00 (05/11): lista, sem digitar símbolo.
@@ -544,14 +545,14 @@ function erroCel(id) {
   let d = val(id).replace(/\D/g, "");
   if (!d) return "";   // celular é opcional
   if (d.length > 11 && d.startsWith("55")) d = d.slice(2);
-  if (d.length === 8 || d.length === 9) return "Celular sem DDD: coloque o DDD antes, ex.: (11) 98586-7941.";
-  if (d.length === 11 && d[2] !== "9") return "Celular com 11 números precisa ter o 9 depois do DDD, ex.: (11) 98586-7941.";
+  if (d.length === 8 || d.length === 9) return "Celular sem DDD: coloque o DDD antes, ex.: (00) 00000-0000.";
+  if (d.length === 11 && d[2] !== "9") return "Celular com 11 números precisa ter o 9 depois do DDD, ex.: (00) 90000-0000.";
   if (d.length !== 10 && d.length !== 11) return "Número com quantidade errada: DDD + número (celular 11 dígitos, fixo 10).";
   return "";
 }
 let CEL_ERRO = "";
 function celularRuim(id = "c_cel") { CEL_ERRO = erroCel(id); return !!CEL_ERRO; }
-// Ao sair do campo: vermelho + mensagem se estiver errado; certo = arruma a máscara (11) 98586-7941
+// Ao sair do campo: vermelho + mensagem se estiver errado; certo = arruma a máscara (00) 00000-0000
 const ehSemDDD = e => e.startsWith("Celular sem DDD");
 function pintarCel(id, saindo) {
   const inp = $("#" + id), campo = $("#" + id + "_campo"), caixa = $("#" + id + "_caixa"), msg = $("#" + id + "_msg");
