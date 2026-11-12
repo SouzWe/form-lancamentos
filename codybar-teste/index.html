@@ -384,7 +384,9 @@ function pagamento() {
   const t = Math.round(totalVenda() * 100) / 100, pg = num(val("pg_valor"));
   if (tipo === "cliente") $("#bloco-compra").classList.toggle("oculto", !temCompra());   // 08/11: sem produto = só cadastro
   const quitou = pg > 0 && t > 0 && pg >= t - 0.005;
-  $("#fs-cobranca").classList.toggle("oculto", quitou);
+  if (tipo === "divida")   // 11/11: a frase mora na COBRANÇA → quitado esconde só data/horário, não o bloco
+    [...$("#fs-cobranca").children].forEach(el => { if (el.tagName !== "LEGEND" && el.id !== "pg_dica") el.classList.toggle("oculto", quitou); });
+  else $("#fs-cobranca").classList.toggle("oculto", quitou);
   $("label[for=cobranca]").textContent = pg > 0 && !quitou ? "Data de cobrança do restante *" : "Data de cobrança *";
   const d = $("#pg_dica"), excesso = pg > t + 0.005;
   d.className = "dica" + (!pg ? "" : excesso ? " excesso" : quitou ? " caixa quitada" : " deve");
@@ -458,8 +460,7 @@ if (tipo === "venda") {
     <fieldset><legend>Recebimento (se já pagou algo)</legend>
       <div class="dupla"><div>${CAMPO("pg_valor", "Recebeu R$", "text", 'inputmode="decimal" placeholder="0,00"')}</div>
         <div><label for="pg_forma">Forma</label><select id="pg_forma"><option value="">—</option><option>dinheiro</option><option>pix</option><option>cartão</option></select></div></div>
-      <div id="caixa-rec-data">${CAMPO("rec_data", "Data do recebimento", "date")}</div>
-      <div class="dica" id="pg_dica">Não recebeu nada? Deixe em branco e marque a data da cobrança.</div></fieldset>
+      <div id="caixa-rec-data">${CAMPO("rec_data", "Data do recebimento", "date")}</div></fieldset>
     ${COBRANCA_HTML}
     <fieldset>${OBS}</fieldset>`;
   document.querySelectorAll(".abas button").forEach(b => b.onclick = () => {
@@ -469,6 +470,9 @@ if (tipo === "venda") {
     $("#m-novo").classList.toggle("oculto", modoCliente !== "novo");
   });
 }
+// 11/11 (Wellington): no Débitos a frase do recebimento fica na COBRANÇA, logo abaixo da data
+if (tipo === "divida") $("#cobranca").insertAdjacentHTML("afterend",
+  `<div class="dica" id="pg_dica">Não recebeu nada? Deixe em branco e marque a data da cobrança.</div>`);
 $("#add").onclick = linhaProduto;
 if ($("#pg_valor")) $("#pg_valor").oninput = pagamento;
 if ($("#ant_valor")) $("#ant_valor").oninput = somar;   // 08/11: débito anterior entra no total do talão
