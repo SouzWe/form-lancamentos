@@ -85,23 +85,30 @@
   .situacao .deve b, .situacao .total b { color: var(--erro); }  /* …só o valor em vermelho (igual ao "Falta R$ X") */
   .situacao .total { text-align: left; margin-top: 2px; }
   .situacao .limpo { color: var(--ok); font-weight: 600; }
-  /* 13/11 (C045/C116): 🗺️ Cobranças por região — só consulta */
-  .cb-reg { font-weight: 600; margin: 26px 0 8px; }
-  .cb-cli { margin: 6px 0; font-size: 15px; }
-  .cb-cli.atraso { color: var(--erro); }
-  .cb-cel { padding-left: 14px; margin-top: 4px; }
-  /* 13/11 (Wellington): linhas contínuas — entre clientes = texto 50%; total = texto 85% */
-  /* 13/11 (Wellington): linha em TODOS os clientes (inclusive o 1º de cada região) e mais espaço em cima/embaixo */
-  .cb-item { border-top: 1px solid rgba(127, 127, 127, .5); border-top-color: color-mix(in srgb, var(--txt) 50%, transparent);
-             margin-top: 12px; padding-top: 14px; padding-bottom: 4px; }
+  /* 13/11 (C045/C116): 🗺️ Cobranças por região — só consulta. Layout v2 (13/11, Wellington) */
+  .cb-busca { margin-bottom: 4px; }
+  /* faixa da região: largura total, cinza claro, sem cantos; letra igual às legendas ("CADASTRO") */
+  .cb-reg { display: flex; justify-content: space-between; gap: 12px; margin: 30px -16px 4px; padding: 9px 16px;
+            background: var(--campo); border-radius: 0; font-weight: 600; font-size: 14px; text-transform: uppercase;
+            letter-spacing: .03em; color: var(--dica); }
+  .cb-reg b { white-space: nowrap; font-weight: 600; }
+  /* cliente: mais espaço em cima/embaixo; linha contínua embaixo de TODOS (texto 50%) */
+  .cb-item { padding: 16px 0 14px; border-bottom: 1px solid rgba(127, 127, 127, .5);
+             border-bottom-color: color-mix(in srgb, var(--txt) 50%, transparent); }
+  .cb-item:has(+ .cb-total) { border-bottom: 0; }   /* antes do total vale só a linha do total */
+  .cb-nome { font-weight: 600; font-size: 15px; }
+  .cb-li { font-size: 14px; margin-top: 3px; }
+  .cb-li.atraso { color: var(--erro); }
+  .cb-cel { text-align: right; margin-top: 10px; }   /* número no fim do bloco, à direita */
   .cb-total { border-top: 1px solid rgba(127, 127, 127, .85); border-top-color: color-mix(in srgb, var(--txt) 85%, transparent);
-              margin-top: 22px; padding-top: 14px; font-weight: 600; }
+              margin-top: 14px; padding-top: 14px; font-weight: 600; }
   /* 13/11: o número é o botão (pílula) — mesmas cores do campo WhatsApp do formulário */
   .cb-num { display: inline-block; border: 1px solid currentColor; border-radius: 999px; padding: 3px 12px;
             background: transparent; font: inherit; font-size: 13px; line-height: 1.4; }
   button.cb-num { cursor: pointer; }
   .cb-num.ok { color: var(--ok); } .cb-num.fixo { color: var(--fixo); } .cb-num.erro { color: var(--erro); }
   .cb-vazio { color: var(--ok); font-weight: 600; margin-top: 18px; }
+  .cb-nada { color: var(--dica); margin-top: 18px; }
   .situacao .rot { color: var(--dica); margin-top: 6px; }   /* 09/11: rótulo "Débitos em aberto:" / "Débito anterior:" */
   .sem-ddd .ddi input { border: 1px solid var(--erro); }
   /* 08/11: CEP — 8 números: certo = borda verde, errado = borda vermelha; vazio pode */
@@ -187,7 +194,7 @@ function erroNumeroCel(v) {
 //      cobrança das vendas, horário dela, venda vencida (1/0), horário do talão]; r = regiões.
 function montarCobrancas() {
   const esc = t => String(t).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
-  const reais = n => "R$ " + n.toFixed(2).replace(".", ",");
+  const reais = n => "R$ " + n.toFixed(2).replace(".", ",").replace(/\B(?=(\d{3})+,)/g, ".");
   const sem = t => (t || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
   const SEM_REG = "__sem";
   const dataISO = s => { const m = /^(\d{2})\/(\d{2})\/(\d{4})/.exec(String(s || "")); return m ? `${m[3]}-${m[2]}-${m[1]}` : ""; };
@@ -209,7 +216,7 @@ function montarCobrancas() {
     const venc = ds.filter(x => x.venc).sort((a, b) => a.d.localeCompare(b.d));
     const outras = ds.filter(x => !x.venc).sort((a, b) => a.d.localeCompare(b.d));
     const cob = venc[0] || outras[0] || null;
-    return { id: c[0], nome: c[1], reg: c[2] || SEM_REG, cel: c[3], total, cob, ordem: cob ? (cob.venc ? 0 : 1) : 2 };
+    return { id: c[0], nome: c[1], reg: c[2] || SEM_REG, cel: c[3], talao, aberto, total, cob, ordem: cob ? (cob.venc ? 0 : 1) : 2 };
   }).filter(x => x.total > 0.004);   // só quem deve (talão + vendas em aberto)
   const regioes = [...BAIRROS];
   devedores.forEach(x => { if (x.reg !== SEM_REG && !regioes.includes(x.reg)) regioes.push(x.reg); });
@@ -219,22 +226,26 @@ function montarCobrancas() {
   const mostraNum = d => d.length < 3 ? d : `(${d.slice(0, 2)}) ` + (d.length - 2 > 4 ? d.slice(2, d.length - 2 >= 9 ? 7 : 6) + "-" + d.slice(d.length - 2 >= 9 ? 7 : 6) : d.slice(2));
   const pilula = x => {
     const d = digitosNumero(x.cel);
-    if (!d) return `<span class="cb-num fixo">✖ sem número</span>`;
+    if (!d) return `<span class="cb-num fixo">⚠️ ✖ sem número</span>`;
     if (erroNumeroCel(x.cel)) return `<span class="cb-num erro">⚠️ ${esc(mostraNum(d))}</span>`;
     const fixo = d.length === 10;
     return `<button type="button" class="cb-num ${fixo ? "fixo" : "ok"}" data-id="${esc(x.id)}" aria-label="Cobrar no WhatsApp">${fixo ? "☎️" : "💬"} ${esc(cel(x.cel))} ›</button>`;
   };
+  // v2: nome + código → 💸 total → data → 🛒 vendas em aberto → 📒 talão → número (à direita)
   const linha = x => {
     const cod = String(x.id).replace(/\D/g, "").slice(-4);
-    const quando = !x.cob ? "sem data de cobrança"
-      : (x.cob.venc ? "venceu " : "cobrança ") + ddmm(x.cob.d) + (x.cob.h ? " " + x.cob.h : "");
-    return `<div class="cb-item"><div class="cb-cli${x.cob && x.cob.venc ? " atraso" : ""}">${x.cob && x.cob.venc ? "⚠️" : "•"} ${esc(x.nome)} ${esc(cod)} · ${reais(x.total)} · ${esc(quando)}</div>`
-      + `<div class="cb-cel">${pilula(x)}</div>`
-      + `</div>`;
+    const quando = !x.cob ? `<div class="cb-li">sem data de cobrança</div>`
+      : x.cob.venc ? `<div class="cb-li atraso">⚠️ venceu ${ddmm(x.cob.d)}</div>`
+      : `<div class="cb-li">📆 cobrança ${ddmm(x.cob.d)}${x.cob.h ? " " + esc(x.cob.h) : ""}</div>`;
+    return `<div class="cb-item"><div class="cb-nome">${esc(x.nome)} ${esc(cod)}</div>`
+      + `<div class="cb-li">💸 ${reais(x.total)}</div>` + quando
+      + (x.aberto > 0 ? `<div class="cb-li">🛒 Débitos em aberto: ${reais(x.aberto)}</div>` : "")
+      + (x.talao > 0 ? `<div class="cb-li">📒 Talão: ${reais(x.talao)}</div>` : "")
+      + `<div class="cb-cel">${pilula(x)}</div></div>`;
   };
   const ordenar = l => l.sort((a, b) => a.ordem - b.ordem || (a.cob && b.cob ? a.cob.d.localeCompare(b.cob.d) : 0) || sem(a.nome).localeCompare(sem(b.nome)));
   const soma = l => Math.round(l.reduce((s, x) => s + x.total, 0) * 100) / 100;
-  const bloco = (reg, l) => `<div class="cb-reg">📍 ${esc(reg === SEM_REG ? "Sem região" : reg)} · ${reais(soma(l))}</div>` + ordenar(l).map(linha).join("");
+  const bloco = (reg, l) => `<div class="cb-reg"><span>📍 ${esc(reg === SEM_REG ? "Sem região" : reg)}</span><b>${reais(soma(l))}</b></div>` + ordenar(l).map(linha).join("");
   // 📲 Cobrar (13/11): abre o WhatsApp do vendedor na conversa do cliente com a mensagem pronta; NÃO envia sozinho.
   // I035 (futuro): trocar SÓ esta função para pedir o envio ao agente do WhatsApp.
   function cobrarWhatsApp(x) {
@@ -250,25 +261,27 @@ function montarCobrancas() {
     if (tg && tg.openLink && tg.platform && tg.platform !== "unknown") tg.openLink(url); else window.open(url, "_blank");
   }
   function mostrar() {
-    const esc_ = $("#cb_regiao").value, el = $("#cb_lista");
+    const esc_ = $("#cb_regiao").value, el = $("#cb_lista"), q = sem($("#cb_busca").value.trim());
     setTimeout(() => el.querySelectorAll("button.cb-num[data-id]").forEach(b => b.onclick = () => cobrarWhatsApp(devedores.find(x => x.id === b.dataset.id))), 0);
-    if (esc_) {
-      const l = devedores.filter(x => x.reg === esc_);
-      el.innerHTML = !l.length ? `<div class="cb-vazio">✅ Ninguém devendo nesta região.</div>`
-        : bloco(esc_, l) + `<div class="cb-total">Total da região: ${reais(soma(l))}</div>`;
+    const vale = x => (!esc_ || x.reg === esc_) && (!q || sem(x.nome).includes(q));   // v2: busca vale junto com a região
+    const lista = devedores.filter(vale);
+    if (!lista.length) {
+      el.innerHTML = q ? `<div class="cb-nada">Nenhum cliente encontrado.</div>` : `<div class="cb-vazio">✅ Ninguém devendo nesta região.</div>`;
       return;
     }
-    const grupos = [...regioes, SEM_REG].map(r => [r, devedores.filter(x => x.reg === r)]).filter(([, l]) => l.length);
-    el.innerHTML = !grupos.length ? `<div class="cb-vazio">✅ Ninguém devendo nesta região.</div>`
-      : grupos.map(([r, l]) => bloco(r, l)).join("") + `<div class="cb-total">Total geral: ${reais(soma(devedores))}</div>`;
+    if (esc_) { el.innerHTML = bloco(esc_, lista) + `<div class="cb-total">Total da região: ${reais(soma(lista))}</div>`; return; }
+    const grupos = [...regioes, SEM_REG].map(r => [r, lista.filter(x => x.reg === r)]).filter(([, l]) => l.length);   // região sem resultado some
+    el.innerHTML = grupos.map(([r, l]) => bloco(r, l)).join("") + `<div class="cb-total">Total geral: ${reais(soma(lista))}</div>`;
   }
   $("#titulo").textContent = "🗺️ Cobranças";
   document.querySelector(".sub").textContent = "Só consulta: não grava nada e não manda nada ao bot.";
   $("#enviar").remove();
-  form.innerHTML = `<label for="cb_regiao">Região</label><select id="cb_regiao"><option value="">Todas as regiões</option>`
+  form.innerHTML = `<div class="cb-busca"><input id="cb_busca" type="search" placeholder="🔍 Buscar cliente pelo nome…" autocomplete="off"></div>`
+    + `<label for="cb_regiao">Região</label><select id="cb_regiao"><option value="">Todas as regiões</option>`
     + regioes.map(r => `<option value="${esc(r)}">${esc(r)}</option>`).join("")
     + (temSem ? `<option value="${SEM_REG}">Sem região</option>` : "") + `</select><div id="cb_lista"></div>`;
   $("#cb_regiao").onchange = mostrar;
+  $("#cb_busca").oninput = mostrar;
   mostrar();
   if (tg) { tg.ready(); tg.expand(); }
 }
