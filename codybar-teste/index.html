@@ -86,15 +86,16 @@
   .situacao .total { text-align: left; margin-top: 2px; }
   .situacao .limpo { color: var(--ok); font-weight: 600; }
   /* 13/11 (C045/C116): 🗺️ Cobranças por região — só consulta */
-  .cb-reg { font-weight: 600; margin: 18px 0 6px; }
+  .cb-reg { font-weight: 600; margin: 26px 0 8px; }
   .cb-cli { margin: 6px 0; font-size: 15px; }
   .cb-cli.atraso { color: var(--erro); }
   .cb-cel { padding-left: 14px; margin-top: 4px; }
   /* 13/11 (Wellington): linhas contínuas — entre clientes = texto 50%; total = texto 85% */
-  .cb-item + .cb-item { border-top: 1px solid rgba(127, 127, 127, .5); border-top-color: color-mix(in srgb, var(--txt) 50%, transparent);
-                        margin-top: 10px; padding-top: 10px; }
+  /* 13/11 (Wellington): linha em TODOS os clientes (inclusive o 1º de cada região) e mais espaço em cima/embaixo */
+  .cb-item { border-top: 1px solid rgba(127, 127, 127, .5); border-top-color: color-mix(in srgb, var(--txt) 50%, transparent);
+             margin-top: 12px; padding-top: 14px; padding-bottom: 4px; }
   .cb-total { border-top: 1px solid rgba(127, 127, 127, .85); border-top-color: color-mix(in srgb, var(--txt) 85%, transparent);
-              margin-top: 18px; padding-top: 10px; font-weight: 600; }
+              margin-top: 22px; padding-top: 14px; font-weight: 600; }
   /* 13/11: o número é o botão (pílula) — mesmas cores do campo WhatsApp do formulário */
   .cb-num { display: inline-block; border: 1px solid currentColor; border-radius: 999px; padding: 3px 12px;
             background: transparent; font: inherit; font-size: 13px; line-height: 1.4; }
