@@ -262,8 +262,10 @@ function escolherCliente(c) {
     clienteEscolhido = null;
     if ($("#bloco-cel")) { $("#bloco-cel").classList.add("oculto"); $("#v_cel").value = ""; }
     $("#caixa-cliente").innerHTML = `<input id="busca" placeholder="Cliente… (toque ou digite)"><div class="achados" id="achados"></div>`;
+    ajustarModalTalao();   // 12/11 (I031): sem cliente = modal completo
     ligarBusca(); $("#busca").focus();
   };
+  ajustarModalTalao();     // 12/11 (I031): cliente com talão = modal encolhe
 }
 const nomeCliente = () => clienteEscolhido ? `${clienteEscolhido[1]} (${clienteEscolhido[0]})` : val("busca");
 
@@ -472,8 +474,9 @@ if (tipo === "venda") {
   form.innerHTML = `
     <div class="abas"><button type="button" data-m="cadastrado" class="on">Já cadastrado</button>
       <button type="button" data-m="novo">Cadastrar agora</button></div>
-    <fieldset><legend>Cliente</legend>
-      <div id="m-cadastrado">${BUSCA_CLIENTE}${BLOCO_CEL}</div><div id="m-novo" class="oculto">${CADASTRO}</div></fieldset>
+    <fieldset id="fs-cliente"><legend>Cliente</legend>
+      <div id="m-cadastrado">${BUSCA_CLIENTE}${BLOCO_CEL}
+        <div class="dica oculto" id="ja-talao">ℹ️ Este cliente já tem talão registrado. Pagamento ou correção: pelo chat do bot.</div></div><div id="m-novo" class="oculto">${CADASTRO}</div></fieldset>
     <fieldset><legend>Débito anterior</legend>
       <div class="dupla"><div>${CAMPO("ant_valor", "Valor R$", "text", 'inputmode="decimal"')}</div>
         <div id="caixa-ant-data">${CAMPO("ant_data", "Data débito anterior", "date")}</div></div></fieldset>
@@ -491,7 +494,27 @@ if (tipo === "venda") {
     document.querySelectorAll(".abas button").forEach(x => x.classList.toggle("on", x === b));
     $("#m-cadastrado").classList.toggle("oculto", modoCliente !== "cadastrado");
     $("#m-novo").classList.toggle("oculto", modoCliente !== "novo");
+    ajustarModalTalao();   // 12/11: Desconto % só no Cadastrar agora; I031 encolhe/abre
   });
+}
+// 12/11 (Wellington): Débitos › Já cadastrado = cliente que AINDA NÃO TEM talão.
+// - Desconto % só no Cadastrar agora (no Já cadastrado some e fica vazio, para não entrar no total).
+// - I031: cliente escolhido com talão (c[4] > 0, o mesmo da caixa de situação) → o modal encolhe:
+//   ficam cliente, celular, situação e a frase; somem os outros blocos e o Enviar. Trocou de cliente → reajusta.
+function ajustarModalTalao() {
+  if (tipo !== "divida") return;
+  const cad = modoCliente === "cadastrado";
+  const desc = $("#desc_pct");
+  if (desc) {
+    desc.closest(".desconto").classList.toggle("oculto", cad);
+    if (cad && desc.value) { desc.value = ""; somar(); }
+  }
+  const c = clienteEscolhido;
+  const temTalao = cad && !!c && c.length >= 6 && (Number(c[4]) || 0) > 0;
+  form.querySelectorAll(":scope > fieldset:not(#fs-cliente)").forEach(f => f.classList.toggle("oculto", temTalao));
+  $("#ja-talao").classList.toggle("oculto", !temTalao);
+  $("#enviar").classList.toggle("oculto", temTalao);
+  if (temTalao) mostrarAviso("");
 }
 // 12/11 (Wellington): no Débitos a COBRANÇA é própria (data | horário lado a lado, frase embaixo) — ver template acima
 $("#add").onclick = linhaProduto;
@@ -513,6 +536,7 @@ if (tipo === "venda") form.insertAdjacentHTML("beforeend", `<fieldset><legend>�
   <div class="dica">Não grava nada. A resposta chega na conversa.</div></fieldset>`);
 linhaProduto();   // linha vazia é ignorada no envio (primeira compra do cliente novo é opcional)
 ligarBusca(); ligarCadastro(); ligarCel("c_cel"); ligarCel("v_cel"); ligarCep();
+ajustarModalTalao();   // 12/11: Débitos abre no Já cadastrado (sem Desconto %)
 
 // 12/11 (Wellington): data/horário/escolha sem valor ficam cinza (classe "vazio"); com valor, cor normal
 function marcarVazios() {
