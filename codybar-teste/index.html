@@ -89,10 +89,17 @@
   .cb-reg { font-weight: 600; margin: 18px 0 6px; }
   .cb-cli { margin: 6px 0; font-size: 15px; }
   .cb-cli.atraso { color: var(--erro); }
-  .cb-cel { color: var(--dica); font-size: 13px; padding-left: 14px; display: flex; align-items: center; gap: 10px; }
-  .cb-item + .cb-item { border-top: 1px dashed rgba(127, 127, 127, .25); margin-top: 8px; padding-top: 8px; }   /* 13/11: linha fina entre clientes */
-  .cb-zap { border: 0; background: var(--campo); border-radius: 8px; padding: 4px 10px; font-size: 18px; line-height: 1; cursor: pointer; }
-  .cb-total { border-top: 1px solid var(--dica); margin-top: 18px; padding-top: 10px; font-weight: 600; }
+  .cb-cel { padding-left: 14px; margin-top: 4px; }
+  /* 13/11 (Wellington): linhas contínuas — entre clientes = texto 50%; total = texto 85% */
+  .cb-item + .cb-item { border-top: 1px solid rgba(127, 127, 127, .5); border-top-color: color-mix(in srgb, var(--txt) 50%, transparent);
+                        margin-top: 10px; padding-top: 10px; }
+  .cb-total { border-top: 1px solid rgba(127, 127, 127, .85); border-top-color: color-mix(in srgb, var(--txt) 85%, transparent);
+              margin-top: 18px; padding-top: 10px; font-weight: 600; }
+  /* 13/11: o número é o botão (pílula) — mesmas cores do campo WhatsApp do formulário */
+  .cb-num { display: inline-block; border: 1px solid currentColor; border-radius: 999px; padding: 3px 12px;
+            background: transparent; font: inherit; font-size: 13px; line-height: 1.4; }
+  button.cb-num { cursor: pointer; }
+  .cb-num.ok { color: var(--ok); } .cb-num.fixo { color: var(--fixo); } .cb-num.erro { color: var(--erro); }
   .cb-vazio { color: var(--ok); font-weight: 600; margin-top: 18px; }
   .situacao .rot { color: var(--dica); margin-top: 6px; }   /* 09/11: rótulo "Débitos em aberto:" / "Débito anterior:" */
   .sem-ddd .ddi input { border: 1px solid var(--erro); }
@@ -159,6 +166,20 @@ async function carregarListas() {
 }
 
 carregarListas().then(montar);
+// ---------- regra do celular (08/11), compartilhada (13/11) ----------
+// Celular = DDD + 9 + 8 dígitos (11); fixo de empresa (WhatsApp Business) = DDD + 8 dígitos (10). +55 aceito.
+// O formulário (erroCel/digitosCel) e a 🗺️ Cobranças usam ESTAS duas funções.
+const digitosNumero = v => { let d = String(v || "").replace(/\D/g, ""); if (d.length > 11 && d.startsWith("55")) d = d.slice(2); return d; };
+function erroNumeroCel(v) {
+  let d = String(v || "").replace(/\D/g, "");
+  if (!d) return "";   // celular é opcional
+  if (d.length > 11 && d.startsWith("55")) d = d.slice(2);
+  if (d.length === 8 || d.length === 9) return "Celular sem DDD: coloque o DDD antes, ex.: (00) 00000-0000.";
+  if (d.length === 11 && d[2] !== "9") return "Celular com 11 números precisa ter o 9 depois do DDD, ex.: (00) 90000-0000.";
+  if (d.length !== 10 && d.length !== 11) return "Número com quantidade errada: DDD + número (celular 11 dígitos, fixo 10).";
+  return "";
+}
+
 // ---------- 🗺️ Cobranças por região (13/11, C045 + C116/I033) ----------
 // Só consulta: sem Enviar, não grava e não manda nada ao bot. Dados no link do botão:
 // c = [id, nome, região, celular, talão, vendas em aberto, talão vencido "DD/MM/AAAA", cobrança do talão,
@@ -193,12 +214,21 @@ function montarCobrancas() {
   devedores.forEach(x => { if (x.reg !== SEM_REG && !regioes.includes(x.reg)) regioes.push(x.reg); });
   regioes.sort((a, b) => sem(a).localeCompare(sem(b)));
   const temSem = CLIENTES.some(c => !c[2]);
+  // 13/11: o número vira o botão. Verde = celular (abre), laranja = fixo (abre), vermelho = errado, laranja "✖ sem número".
+  const mostraNum = d => d.length < 3 ? d : `(${d.slice(0, 2)}) ` + (d.length - 2 > 4 ? d.slice(2, d.length - 2 >= 9 ? 7 : 6) + "-" + d.slice(d.length - 2 >= 9 ? 7 : 6) : d.slice(2));
+  const pilula = x => {
+    const d = digitosNumero(x.cel);
+    if (!d) return `<span class="cb-num fixo">✖ sem número</span>`;
+    if (erroNumeroCel(x.cel)) return `<span class="cb-num erro">⚠️ ${esc(mostraNum(d))}</span>`;
+    const fixo = d.length === 10;
+    return `<button type="button" class="cb-num ${fixo ? "fixo" : "ok"}" data-id="${esc(x.id)}" aria-label="Cobrar no WhatsApp">${fixo ? "☎️" : "💬"} ${esc(cel(x.cel))} ›</button>`;
+  };
   const linha = x => {
     const cod = String(x.id).replace(/\D/g, "").slice(-4);
     const quando = !x.cob ? "sem data de cobrança"
       : (x.cob.venc ? "venceu " : "cobrança ") + ddmm(x.cob.d) + (x.cob.h ? " " + x.cob.h : "");
     return `<div class="cb-item"><div class="cb-cli${x.cob && x.cob.venc ? " atraso" : ""}">${x.cob && x.cob.venc ? "⚠️" : "•"} ${esc(x.nome)} ${esc(cod)} · ${reais(x.total)} · ${esc(quando)}</div>`
-      + (cel(x.cel) ? `<div class="cb-cel"><span>${esc(cel(x.cel))}</span><button type="button" class="cb-zap" data-id="${esc(x.id)}" aria-label="Cobrar no WhatsApp">📲</button></div>` : "")
+      + `<div class="cb-cel">${pilula(x)}</div>`
       + `</div>`;
   };
   const ordenar = l => l.sort((a, b) => a.ordem - b.ordem || (a.cob && b.cob ? a.cob.d.localeCompare(b.cob.d) : 0) || sem(a.nome).localeCompare(sem(b.nome)));
@@ -220,7 +250,7 @@ function montarCobrancas() {
   }
   function mostrar() {
     const esc_ = $("#cb_regiao").value, el = $("#cb_lista");
-    setTimeout(() => el.querySelectorAll(".cb-zap").forEach(b => b.onclick = () => cobrarWhatsApp(devedores.find(x => x.id === b.dataset.id))), 0);
+    setTimeout(() => el.querySelectorAll("button.cb-num[data-id]").forEach(b => b.onclick = () => cobrarWhatsApp(devedores.find(x => x.id === b.dataset.id))), 0);
     if (esc_) {
       const l = devedores.filter(x => x.reg === esc_);
       el.innerHTML = !l.length ? `<div class="cb-vazio">✅ Ninguém devendo nesta região.</div>`
@@ -677,15 +707,7 @@ function montarTexto() {
 
 // Celular (08/11): trava no formulário, igual à regra do motor (DDD + número = 10 ou 11 dígitos; +55 aceito)
 // Celular = DDD + 9 + 8 dígitos (11); fixo de empresa (WhatsApp Business) = DDD + 8 dígitos (10). +55 aceito.
-function erroCel(id) {
-  let d = val(id).replace(/\D/g, "");
-  if (!d) return "";   // celular é opcional
-  if (d.length > 11 && d.startsWith("55")) d = d.slice(2);
-  if (d.length === 8 || d.length === 9) return "Celular sem DDD: coloque o DDD antes, ex.: (00) 00000-0000.";
-  if (d.length === 11 && d[2] !== "9") return "Celular com 11 números precisa ter o 9 depois do DDD, ex.: (00) 90000-0000.";
-  if (d.length !== 10 && d.length !== 11) return "Número com quantidade errada: DDD + número (celular 11 dígitos, fixo 10).";
-  return "";
-}
+function erroCel(id) { return erroNumeroCel(val(id)); }   // 13/11: a regra mora em erroNumeroCel (global)
 let CEL_ERRO = "";
 function celularRuim(id = "c_cel") { CEL_ERRO = erroCel(id); return !!CEL_ERRO; }
 // Ao sair do campo: vermelho + mensagem se estiver errado; certo = arruma a máscara (00) 00000-0000
@@ -715,7 +737,7 @@ function ligarCel(id) {
   inp.addEventListener("input", () => pintarCel(id, false));
 }
 
-const digitosCel = v => { let d = String(v || "").replace(/\D/g, ""); if (d.length > 11 && d.startsWith("55")) d = d.slice(2); return d; };
+const digitosCel = digitosNumero;   // 13/11: mesma regra da 🗺️ Cobranças
 function formatarCel(v) {
   const d = digitosCel(v);
   if (d.length === 11) return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`;
