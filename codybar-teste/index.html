@@ -90,6 +90,7 @@
   /* 08/11: CEP — 8 números: certo = borda verde, errado = borda vermelha; vazio pode */
   .cep-ok input { border: 1px solid var(--ok); }
   .cep-ruim input { border: 1px solid var(--erro); }
+  input.erro-campo, select.erro-campo, .add.erro-campo { border: 1px solid var(--erro) !important; }   /* 12/11: campo do erro ao enviar */
   pre { white-space: pre-wrap; background: var(--campo); padding: 12px; border-radius: 10px; font-size: 13px; }
   .abas { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; background: var(--campo); padding: 4px;
           border-radius: 12px; margin-bottom: 14px; }
@@ -374,7 +375,7 @@ function produtos() {
     }
     const novo = !p && g("nome") && (PRODUTOS.length || l.querySelector("[data-novo]"));
     return { nome: p ? `${p[1]} (${p[0]})` : g("nome") + (novo ? " (produto novo)" : ""), qtd: g("qtd") || (p && comQtd() ? "1" : ""), preco: g("preco"), valor: g("valor"),
-             tabela: p ? Number(p[3]) : 0, busca: p ? "" : g("busca") };
+             tabela: p ? Number(p[3]) : 0, busca: p ? "" : g("busca"), el: l };
   }).filter(p => p.nome || p.busca || p.qtd || p.preco || p.valor);
 }
 
@@ -709,6 +710,53 @@ function conferir() {
   return "";
 }
 
+// 12/11 (Wellington): ao enviar com erro, o campo do erro ganha borda vermelha, a tela rola até ele e põe o foco.
+// As frases e as travas não mudam: aqui só se acha o campo de cada frase. Celular/CEP já pintam sozinhos (só rola).
+const campoProd = l => l && (l.querySelector("[data-k=busca], [data-k=nome]"));
+function camposDoErro(e) {
+  if (!e) return { marcar: [], ir: null };
+  const um = id => $("#" + id) ? [$("#" + id)] : [];
+  const cli = () => (tipo === "cliente" || (tipo === "divida" && modoCliente === "novo")) ? um("c_nome") : um("busca");
+  const linhas = [...document.querySelectorAll("#produtos .linha")];
+  let m = [];
+  if (/^(Escolha o cliente|Falta o cliente|Falta o nome do cliente)/.test(e)) m = cli();
+  else if (e === CEL_ERRO && CEL_ERRO) {
+    const id = tipo === "venda" || (tipo === "divida" && modoCliente !== "novo") ? "v_cel" : "c_cel";
+    return { marcar: [], ir: $("#" + id) };
+  }
+  else if (e.startsWith("CEP precisa")) return { marcar: [], ir: $("#c_cep") };
+  else if (e.startsWith("Toque no produto")) { const p = produtos().find(p => !p.nome && p.busca); m = p ? [campoProd(p.el)] : []; }
+  else if (e.startsWith("Coloque pelo menos um produto")) {
+    const l = linhas.find(l => !produtos().some(p => p.el === l && p.nome)) || linhas[0];
+    m = l ? [campoProd(l)] : um("add");
+  }
+  else if (e.startsWith("Coloque algum valor")) m = [...um("ant_valor"), linhas[0] && linhas[0].querySelector("[data-k=valor]")];
+  else if (e.startsWith("Falta a data da venda")) m = um("data");
+  else if (e.startsWith("Escolha a forma")) m = um("pg_forma");
+  else if (/^(Coloque o valor pago|Valor pago inválido|Pago maior|Recebido maior)/.test(e)) m = um("pg_valor");
+  else if (e.startsWith("Falta a data do recebimento")) m = um("rec_data");
+  else if (/falta a data da cobrança|Falta a data da cobrança/.test(e)) m = um("cobranca");
+  else if (e.startsWith("Desconto precisa")) m = um("desc_pct");
+  m = m.filter(Boolean);
+  return { marcar: m, ir: m[0] || null };
+}
+function marcarErro(e) {
+  document.querySelectorAll(".erro-campo").forEach(x => x.classList.remove("erro-campo"));
+  const { marcar, ir } = camposDoErro(e);
+  marcar.forEach(x => x.classList.add("erro-campo"));
+  if (!ir) return;
+  ir.scrollIntoView({ behavior: "smooth", block: "center" });
+  try { ir.focus({ preventScroll: true }); } catch (_) { ir.focus(); }
+}
+// Corrigiu → a borda some (confere de novo; se o erro daquele campo saiu, tira a borda)
+function rever() {
+  const marcados = [...document.querySelectorAll(".erro-campo")];
+  if (!marcados.length) return;
+  const agora = camposDoErro(conferir()).marcar;
+  marcados.forEach(x => { if (!agora.includes(x)) x.classList.remove("erro-campo"); });
+}
+["input", "change", "click"].forEach(ev => document.addEventListener(ev, () => setTimeout(rever, 0)));
+
 // 08/11: o aviso de erro fica no topo da parte visível da tela (acima do teclado, se estiver aberto) e some ao corrigir
 let avisoTimer;
 function mostrarAviso(t) {
@@ -730,6 +778,7 @@ $("#enviar").onclick = () => {
   if ($("#pergunta") && val("pergunta") && nadaLancado) { perguntar(); return; }
   const erro = conferir();
   mostrarAviso(erro);
+  marcarErro(erro);   // 12/11: borda vermelha + rola até o campo
   if (erro) return;
   entregar(montarTexto());
 };
