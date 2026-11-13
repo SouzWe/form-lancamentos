@@ -320,7 +320,8 @@ function montarCobrancas() {
       waze: () => abrirLink(`https://waze.com/ul?q=${d}&navigate=yes`),
       maps: () => abrirLink(maps),
       copiar: () => copiarTexto(destino),
-      whats: () => abrirLink(`https://wa.me/?text=${encodeURIComponent(`📍 ${x.nome}\n${destino}\n${maps}`)}`),
+      // 13/11: copia o endereço DENTRO do toque (antes de abrir o WhatsApp); se a cópia falhar, abre igual
+      whats: () => { try { copiarTexto(destino); } catch (e) {} abrirLink(`https://wa.me/?text=${encodeURIComponent(`📍 ${x.nome}\n${destino}\n${maps}`)}`); },
     };
     const ult = lerApp();
     const bt = (k, txt) => `<button type="button" data-app="${k}"${k === ult ? ' class="ultimo"' : ""}>${txt}</button>`;
