@@ -96,7 +96,12 @@
   .cb-item { padding: 16px 0 14px; border-bottom: 1px solid rgba(127, 127, 127, .5);
              border-bottom-color: color-mix(in srgb, var(--txt) 50%, transparent); }
   .cb-item:has(+ .cb-total) { border-bottom: 0; }   /* antes do total vale só a linha do total */
-  .cb-nome { font-weight: 600; font-size: 15px; }
+  .cb-nome { font-weight: 600; font-size: 15px; padding-right: 44px; }
+  /* 13/11: 🗺️ rota no canto superior direito do bloco (acima do número); sem endereço nem CEP = apagado */
+  .cb-item { position: relative; }
+  .cb-rota { position: absolute; top: 10px; right: 0; border: 0; background: none; padding: 4px 6px;
+             font-size: 22px; line-height: 1; cursor: pointer; }
+  .cb-rota.off { opacity: .25; cursor: default; }
   .cb-li { font-size: 14px; margin-top: 3px; }
   .cb-li.atraso { color: var(--erro); }
   .cb-cel { text-align: right; margin-top: 10px; }   /* número no fim do bloco, à direita */
@@ -114,6 +119,9 @@
   /* 08/11: CEP — 8 números: certo = borda verde, errado = borda vermelha; vazio pode */
   .cep-ok input { border: 1px solid var(--ok); }
   .cep-ruim input { border: 1px solid var(--erro); }
+  /* 13/11 (I034): endereço pelo CEP */
+  .cep-usar { margin-top: 6px; padding: 6px 12px; border: 1px solid var(--ok); border-radius: 999px;
+              background: none; color: var(--ok); font: inherit; font-size: 13px; cursor: pointer; }
   input.erro-campo, select.erro-campo, .add.erro-campo { border: 1px solid var(--erro) !important; }   /* 12/11: campo do erro ao enviar */
   pre { white-space: pre-wrap; background: var(--campo); padding: 12px; border-radius: 10px; font-size: 13px; }
   .abas { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; background: var(--campo); padding: 4px;
@@ -216,7 +224,8 @@ function montarCobrancas() {
     const venc = ds.filter(x => x.venc).sort((a, b) => a.d.localeCompare(b.d));
     const outras = ds.filter(x => !x.venc).sort((a, b) => a.d.localeCompare(b.d));
     const cob = venc[0] || outras[0] || null;
-    return { id: c[0], nome: c[1], reg: c[2] || SEM_REG, cel: c[3], talao, aberto, total, cob, ordem: cob ? (cob.venc ? 0 : 1) : 2 };
+    return { id: c[0], nome: c[1], reg: c[2] || SEM_REG, cel: c[3], talao, aberto, total, cob, ordem: cob ? (cob.venc ? 0 : 1) : 2,
+             end: String(c[12] || "").trim(), cep: String(c[13] || "").replace(/\D/g, "") };   // 13/11: 13º/14º = endereço, CEP
   }).filter(x => x.total > 0.004);   // só quem deve (talão + vendas em aberto)
   const regioes = [...BAIRROS];
   devedores.forEach(x => { if (x.reg !== SEM_REG && !regioes.includes(x.reg)) regioes.push(x.reg); });
@@ -237,7 +246,10 @@ function montarCobrancas() {
     const quando = !x.cob ? `<div class="cb-li">sem data de cobrança</div>`
       : x.cob.venc ? `<div class="cb-li atraso">⚠️ venceu ${ddmm(x.cob.d)}</div>`
       : `<div class="cb-li">📆 cobrança ${ddmm(x.cob.d)}${x.cob.h ? " " + esc(x.cob.h) : ""}</div>`;
-    return `<div class="cb-item"><div class="cb-nome">${esc(x.nome)} ${esc(cod)}</div>`
+    const rota = x.end || x.cep
+      ? `<button type="button" class="cb-rota" data-rota="${esc(x.id)}" aria-label="Rota até o cliente">🗺️</button>`
+      : `<span class="cb-rota off" aria-label="Sem endereço">🗺️</span>`;
+    return `<div class="cb-item">${rota}<div class="cb-nome">${esc(x.nome)} ${esc(cod)}</div>`
       + `<div class="cb-li">💸 ${reais(x.total)}</div>` + quando
       + (x.aberto > 0 ? `<div class="cb-li">🛒 Débitos em aberto: ${reais(x.aberto)}</div>` : "")
       + (x.talao > 0 ? `<div class="cb-li">📒 Talão: ${reais(x.talao)}</div>` : "")
@@ -257,12 +269,24 @@ function montarCobrancas() {
     const msg = !x.cob ? `Olá, ${nome}! Passando para lembrar do valor em aberto de ${reais(x.total)}.${fim}`
       : x.cob.venc ? `Olá, ${nome}! Passando para lembrar da cobrança de ${reais(x.total)}, que venceu em ${ddmm(x.cob.d)}.${fim}`
       : `Olá, ${nome}! Passando para lembrar da cobrança de ${reais(x.total)}, combinada para ${ddmm(x.cob.d)}.${fim}`;
-    const url = `https://wa.me/55${d}?text=${encodeURIComponent(msg)}`;
+    abrirLink(`https://wa.me/55${d}?text=${encodeURIComponent(msg)}`);
+  }
+  function abrirLink(url) {
     if (tg && tg.openLink && tg.platform && tg.platform !== "unknown") tg.openLink(url); else window.open(url, "_blank");
+  }
+  // 🗺️ Rota (13/11): Google Maps de onde o vendedor está (sem origem = GPS) até o cliente.
+  function abrirRota(x) {
+    if (!x || (!x.end && !x.cep)) return;
+    const cep = x.cep.length === 8 ? x.cep.slice(0, 5) + "-" + x.cep.slice(5) : x.cep;
+    const destino = [x.end, x.reg !== SEM_REG ? x.reg : "", cep].filter(Boolean).join(", ");
+    abrirLink(`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(destino)}`);
   }
   function mostrar() {
     const esc_ = $("#cb_regiao").value, el = $("#cb_lista"), q = sem($("#cb_busca").value.trim());
-    setTimeout(() => el.querySelectorAll("button.cb-num[data-id]").forEach(b => b.onclick = () => cobrarWhatsApp(devedores.find(x => x.id === b.dataset.id))), 0);
+    setTimeout(() => {
+      el.querySelectorAll("button.cb-num[data-id]").forEach(b => b.onclick = () => cobrarWhatsApp(devedores.find(x => x.id === b.dataset.id)));
+      el.querySelectorAll("button.cb-rota[data-rota]").forEach(b => b.onclick = () => abrirRota(devedores.find(x => x.id === b.dataset.rota)));
+    }, 0);
     const vale = x => (!esc_ || x.reg === esc_) && (!q || sem(x.nome).includes(q));   // v2: busca vale junto com a região
     const lista = devedores.filter(vale);
     if (!lista.length) {
@@ -415,8 +439,10 @@ const CADASTRO = `
   <select id="c_bairro"><option value="">—</option>${opsBairro}<option value="${OUTRO}">Outros (escrever)</option></select>
   <input id="c_bairro_novo" class="oculto" placeholder="Nome do bairro novo" style="margin-top:8px">
   ${CAMPO("c_end", "Endereço")}
+  <div class="dica oculto" id="c_end_dica"></div>
   ${CAMPO("c_ref", "Referência (ponto conhecido perto)")}
-  <div id="c_cep_campo">${CAMPO("c_cep", "CEP", "text", 'inputmode="numeric" placeholder="00000-000"')}</div>
+  <div id="c_cep_campo">${CAMPO("c_cep", "CEP", "text", 'inputmode="numeric" placeholder="00000-000"')}
+    <div class="dica oculto" id="c_cep_dica"></div></div>
   <div class="dupla"><div>${LISTA_HORA("c_hora_de", "Melhor horário da visita: das", "—")}</div>
     <div>${LISTA_HORA("c_hora_ate", "às", "—")}</div></div>
   ${CAMPO("c_email", "E-mail", "email")}`;
@@ -792,7 +818,57 @@ function ligarCep() {
   const inp = $("#c_cep");
   if (!inp) return;
   inp.addEventListener("blur", () => pintarCep(true));
-  inp.addEventListener("input", () => pintarCep(false));
+  inp.addEventListener("input", () => { pintarCep(false); buscarCep(); });
+}
+// I034 (13/11): CEP com 8 números → consulta o ViaCEP (só o CEP sai do celular). Preenche "Rua, " no Endereço
+// com o cursor no fim (falta o número), dica com bairro/cidade e sugere a região se bater com a lista.
+// Não acha / sem internet: aviso discreto, não trava o envio. Endereço já digitado: pergunta antes de trocar.
+// O texto enviado ao bot não muda (Endereço, CEP, Bairro continuam vindo dos campos).
+let cepConsultado = "";
+function regiaoDoCep(bairro) {
+  const n = sem(bairro).trim();
+  if (!n || !BAIRROS.length) return "";
+  const exato = BAIRROS.find(r => sem(r).trim() === n);
+  if (exato) return exato;
+  const perto = BAIRROS.filter(r => { const m = sem(r).trim(); return m && (m.includes(n) || n.includes(m)); });
+  return perto.length === 1 ? perto[0] : "";   // nunca cria região: sem certeza, o vendedor escolhe
+}
+function mostrarDica(id, html) { const el = $("#" + id); if (!el) return; el.innerHTML = html; el.classList.toggle("oculto", !html); }
+function buscarCep() {
+  const d = val("c_cep").replace(/\D/g, "");
+  if (d.length !== 8) { cepConsultado = ""; mostrarDica("c_cep_dica", ""); mostrarDica("c_end_dica", ""); return; }
+  if (d === cepConsultado) return;
+  cepConsultado = d;
+  mostrarDica("c_cep_dica", "");
+  const naoAchou = () => { if (cepConsultado === d) mostrarDica("c_cep_dica", "CEP não encontrado, preencha à mão."); };
+  const ctl = window.AbortController ? new AbortController() : null;
+  const tempo = setTimeout(() => ctl && ctl.abort(), 6000);
+  fetch(`https://viacep.com.br/ws/${d}/json/`, ctl ? { signal: ctl.signal } : {})
+    .then(r => r.ok ? r.json() : Promise.reject())
+    .then(c => {
+      clearTimeout(tempo);
+      if (cepConsultado !== d) return;           // o vendedor já trocou o CEP
+      if (!c || c.erro) return naoAchou();
+      const cidade = [c.localidade, c.uf].filter(Boolean).join("/");
+      const dica = esc([c.bairro, cidade].filter(Boolean).join(" · ")) + " (pelo CEP)";
+      const reg = regiaoDoCep(c.bairro);
+      const sel = $("#c_bairro");
+      if (reg && sel && !sel.classList.contains("oculto") && !sel.value) {
+        sel.value = reg;
+        $("#c_bairro_novo").classList.add("oculto");
+      }
+      if (!c.logradouro) { mostrarDica("c_end_dica", dica); return; }   // CEP geral da cidade: só a dica
+      const rua = c.logradouro + ", ", end = $("#c_end");
+      const usar = () => {
+        end.value = rua; end.focus();
+        try { end.setSelectionRange(rua.length, rua.length); } catch (e) {}
+        mostrarDica("c_end_dica", dica);
+      };
+      if (!val("c_end")) return usar();
+      mostrarDica("c_end_dica", `${dica}<br><button type="button" class="cep-usar" id="cep_usar">Usar endereço do CEP? ${esc(c.logradouro)}</button>`);
+      $("#cep_usar").onclick = usar;
+    })
+    .catch(() => { clearTimeout(tempo); naoAchou(); });
 }
 
 // 08/11 (Wellington): só fica verde com celular completo (DDD + 9 números). Fixo (DDD + 8) passa sem trava,
