@@ -89,7 +89,9 @@
   .cb-reg { font-weight: 600; margin: 18px 0 6px; }
   .cb-cli { margin: 6px 0; font-size: 15px; }
   .cb-cli.atraso { color: var(--erro); }
-  .cb-cel { color: var(--dica); font-size: 13px; padding-left: 14px; }
+  .cb-cel { color: var(--dica); font-size: 13px; padding-left: 14px; display: flex; align-items: center; gap: 10px; }
+  .cb-item + .cb-item { border-top: 1px dashed rgba(127, 127, 127, .25); margin-top: 8px; padding-top: 8px; }   /* 13/11: linha fina entre clientes */
+  .cb-zap { border: 0; background: var(--campo); border-radius: 8px; padding: 4px 10px; font-size: 18px; line-height: 1; cursor: pointer; }
   .cb-total { border-top: 1px solid var(--dica); margin-top: 18px; padding-top: 10px; font-weight: 600; }
   .cb-vazio { color: var(--ok); font-weight: 600; margin-top: 18px; }
   .situacao .rot { color: var(--dica); margin-top: 6px; }   /* 09/11: rótulo "Débitos em aberto:" / "Débito anterior:" */
@@ -195,14 +197,30 @@ function montarCobrancas() {
     const cod = String(x.id).replace(/\D/g, "").slice(-4);
     const quando = !x.cob ? "sem data de cobrança"
       : (x.cob.venc ? "venceu " : "cobrança ") + ddmm(x.cob.d) + (x.cob.h ? " " + x.cob.h : "");
-    return `<div class="cb-cli${x.cob && x.cob.venc ? " atraso" : ""}">${x.cob && x.cob.venc ? "⚠️" : "•"} ${esc(x.nome)} ${esc(cod)} · ${reais(x.total)} · ${esc(quando)}</div>`
-      + (cel(x.cel) ? `<div class="cb-cel">${esc(cel(x.cel))}</div>` : "");
+    return `<div class="cb-item"><div class="cb-cli${x.cob && x.cob.venc ? " atraso" : ""}">${x.cob && x.cob.venc ? "⚠️" : "•"} ${esc(x.nome)} ${esc(cod)} · ${reais(x.total)} · ${esc(quando)}</div>`
+      + (cel(x.cel) ? `<div class="cb-cel"><span>${esc(cel(x.cel))}</span><button type="button" class="cb-zap" data-id="${esc(x.id)}" aria-label="Cobrar no WhatsApp">📲</button></div>` : "")
+      + `</div>`;
   };
   const ordenar = l => l.sort((a, b) => a.ordem - b.ordem || (a.cob && b.cob ? a.cob.d.localeCompare(b.cob.d) : 0) || sem(a.nome).localeCompare(sem(b.nome)));
   const soma = l => Math.round(l.reduce((s, x) => s + x.total, 0) * 100) / 100;
   const bloco = (reg, l) => `<div class="cb-reg">📍 ${esc(reg === SEM_REG ? "Sem região" : reg)} · ${reais(soma(l))}</div>` + ordenar(l).map(linha).join("");
+  // 📲 Cobrar (13/11): abre o WhatsApp do vendedor na conversa do cliente com a mensagem pronta; NÃO envia sozinho.
+  // I035 (futuro): trocar SÓ esta função para pedir o envio ao agente do WhatsApp.
+  function cobrarWhatsApp(x) {
+    let d = String(x.cel || "").replace(/\D/g, "");
+    if (d.length > 11 && d.startsWith("55")) d = d.slice(2);
+    if (!d) return;
+    const nome = String(x.nome).trim().split(/\s+/)[0];
+    const fim = " Qualquer dúvida, estou à disposição. 😊";
+    const msg = !x.cob ? `Olá, ${nome}! Passando para lembrar do valor em aberto de ${reais(x.total)}.${fim}`
+      : x.cob.venc ? `Olá, ${nome}! Passando para lembrar da cobrança de ${reais(x.total)}, que venceu em ${ddmm(x.cob.d)}.${fim}`
+      : `Olá, ${nome}! Passando para lembrar da cobrança de ${reais(x.total)}, combinada para ${ddmm(x.cob.d)}.${fim}`;
+    const url = `https://wa.me/55${d}?text=${encodeURIComponent(msg)}`;
+    if (tg && tg.openLink && tg.platform && tg.platform !== "unknown") tg.openLink(url); else window.open(url, "_blank");
+  }
   function mostrar() {
     const esc_ = $("#cb_regiao").value, el = $("#cb_lista");
+    setTimeout(() => el.querySelectorAll(".cb-zap").forEach(b => b.onclick = () => cobrarWhatsApp(devedores.find(x => x.id === b.dataset.id))), 0);
     if (esc_) {
       const l = devedores.filter(x => x.reg === esc_);
       el.innerHTML = !l.length ? `<div class="cb-vazio">✅ Ninguém devendo nesta região.</div>`
