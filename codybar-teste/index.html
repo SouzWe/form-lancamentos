@@ -85,6 +85,13 @@
   .situacao .deve b, .situacao .total b { color: var(--erro); }  /* …só o valor em vermelho (igual ao "Falta R$ X") */
   .situacao .total { text-align: left; margin-top: 2px; }
   .situacao .limpo { color: var(--ok); font-weight: 600; }
+  /* 13/11 (C045/C116): 🗺️ Cobranças por região — só consulta */
+  .cb-reg { font-weight: 600; margin: 18px 0 6px; }
+  .cb-cli { margin: 6px 0; font-size: 15px; }
+  .cb-cli.atraso { color: var(--erro); }
+  .cb-cel { color: var(--dica); font-size: 13px; padding-left: 14px; }
+  .cb-total { border-top: 1px solid var(--dica); margin-top: 18px; padding-top: 10px; font-weight: 600; }
+  .cb-vazio { color: var(--ok); font-weight: 600; margin-top: 18px; }
   .situacao .rot { color: var(--dica); margin-top: 6px; }   /* 09/11: rótulo "Débitos em aberto:" / "Débito anterior:" */
   .sem-ddd .ddi input { border: 1px solid var(--erro); }
   /* 08/11: CEP — 8 números: certo = borda verde, errado = borda vermelha; vazio pode */
@@ -129,7 +136,7 @@
 
 <script>
 const tg = window.Telegram && Telegram.WebApp;
-const TIPOS = ["venda", "cliente", "divida"];
+const TIPOS = ["venda", "cliente", "divida", "cobrancas"];   // 13/11: 🗺️ Cobranças (só consulta)
 const tipo = TIPOS.includes(new URLSearchParams(location.search).get("tipo")) ? new URLSearchParams(location.search).get("tipo") : "venda";
 const $ = s => document.querySelector(s);
 const form = $("#form");
@@ -150,6 +157,73 @@ async function carregarListas() {
 }
 
 carregarListas().then(montar);
+// ---------- 🗺️ Cobranças por região (13/11, C045 + C116/I033) ----------
+// Só consulta: sem Enviar, não grava e não manda nada ao bot. Dados no link do botão:
+// c = [id, nome, região, celular, talão, vendas em aberto, talão vencido "DD/MM/AAAA", cobrança do talão,
+//      cobrança das vendas, horário dela, venda vencida (1/0), horário do talão]; r = regiões.
+function montarCobrancas() {
+  const esc = t => String(t).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+  const reais = n => "R$ " + n.toFixed(2).replace(".", ",");
+  const sem = t => (t || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+  const SEM_REG = "__sem";
+  const dataISO = s => { const m = /^(\d{2})\/(\d{2})\/(\d{4})/.exec(String(s || "")); return m ? `${m[3]}-${m[2]}-${m[1]}` : ""; };
+  const d0 = new Date(); d0.setMinutes(d0.getMinutes() - d0.getTimezoneOffset());
+  const hoje = d0.toISOString().slice(0, 10);
+  const ddmm = iso => iso.slice(8, 10) + "/" + iso.slice(5, 7);
+  const cel = v => {
+    let d = String(v || "").replace(/\D/g, "");
+    if (d.length > 11 && d.startsWith("55")) d = d.slice(2);
+    return d.length === 11 ? `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`
+      : d.length === 10 ? `(${d.slice(0, 2)}) ${d.slice(2, 6)}-${d.slice(6)}` : d;
+  };
+  // Data da cobrança = a mais próxima entre venda e talão; vencida tem prioridade (a mais antiga)
+  const devedores = CLIENTES.map(c => {
+    const talao = Number(c[4]) || 0, aberto = Number(c[5]) || 0, total = Math.round((talao + aberto) * 100) / 100;
+    const ds = [];
+    if (talao > 0) { const d = dataISO(c[6]) || dataISO(c[7]); if (d) ds.push({ d, h: c[11] || "", venc: !!c[6] || d < hoje }); }
+    if (aberto > 0) { const d = dataISO(c[8]); if (d) ds.push({ d, h: c[9] || "", venc: c[10] === 1 || d < hoje }); }
+    const venc = ds.filter(x => x.venc).sort((a, b) => a.d.localeCompare(b.d));
+    const outras = ds.filter(x => !x.venc).sort((a, b) => a.d.localeCompare(b.d));
+    const cob = venc[0] || outras[0] || null;
+    return { id: c[0], nome: c[1], reg: c[2] || SEM_REG, cel: c[3], total, cob, ordem: cob ? (cob.venc ? 0 : 1) : 2 };
+  }).filter(x => x.total > 0.004);   // só quem deve (talão + vendas em aberto)
+  const regioes = [...BAIRROS];
+  devedores.forEach(x => { if (x.reg !== SEM_REG && !regioes.includes(x.reg)) regioes.push(x.reg); });
+  regioes.sort((a, b) => sem(a).localeCompare(sem(b)));
+  const temSem = CLIENTES.some(c => !c[2]);
+  const linha = x => {
+    const cod = String(x.id).replace(/\D/g, "").slice(-4);
+    const quando = !x.cob ? "sem data de cobrança"
+      : (x.cob.venc ? "venceu " : "cobrança ") + ddmm(x.cob.d) + (x.cob.h ? " " + x.cob.h : "");
+    return `<div class="cb-cli${x.cob && x.cob.venc ? " atraso" : ""}">${x.cob && x.cob.venc ? "⚠️" : "•"} ${esc(x.nome)} ${esc(cod)} · ${reais(x.total)} · ${esc(quando)}</div>`
+      + (cel(x.cel) ? `<div class="cb-cel">${esc(cel(x.cel))}</div>` : "");
+  };
+  const ordenar = l => l.sort((a, b) => a.ordem - b.ordem || (a.cob && b.cob ? a.cob.d.localeCompare(b.cob.d) : 0) || sem(a.nome).localeCompare(sem(b.nome)));
+  const soma = l => Math.round(l.reduce((s, x) => s + x.total, 0) * 100) / 100;
+  const bloco = (reg, l) => `<div class="cb-reg">📍 ${esc(reg === SEM_REG ? "Sem região" : reg)} · ${reais(soma(l))}</div>` + ordenar(l).map(linha).join("");
+  function mostrar() {
+    const esc_ = $("#cb_regiao").value, el = $("#cb_lista");
+    if (esc_) {
+      const l = devedores.filter(x => x.reg === esc_);
+      el.innerHTML = !l.length ? `<div class="cb-vazio">✅ Ninguém devendo nesta região.</div>`
+        : bloco(esc_, l) + `<div class="cb-total">Total da região: ${reais(soma(l))}</div>`;
+      return;
+    }
+    const grupos = [...regioes, SEM_REG].map(r => [r, devedores.filter(x => x.reg === r)]).filter(([, l]) => l.length);
+    el.innerHTML = !grupos.length ? `<div class="cb-vazio">✅ Ninguém devendo nesta região.</div>`
+      : grupos.map(([r, l]) => bloco(r, l)).join("") + `<div class="cb-total">Total geral: ${reais(soma(devedores))}</div>`;
+  }
+  $("#titulo").textContent = "🗺️ Cobranças";
+  document.querySelector(".sub").textContent = "Só consulta: não grava nada e não manda nada ao bot.";
+  $("#enviar").remove();
+  form.innerHTML = `<label for="cb_regiao">Região</label><select id="cb_regiao"><option value="">Todas as regiões</option>`
+    + regioes.map(r => `<option value="${esc(r)}">${esc(r)}</option>`).join("")
+    + (temSem ? `<option value="${SEM_REG}">Sem região</option>` : "") + `</select><div id="cb_lista"></div>`;
+  $("#cb_regiao").onchange = mostrar;
+  mostrar();
+  if (tg) { tg.ready(); tg.expand(); }
+}
+
 function montar() {
 const OUTRO = "__outro";
 
@@ -160,6 +234,7 @@ const num = v => { const n = parseFloat(String(v || "").replace(/\./g, "").repla
 const val = id => ($("#" + id)?.value || "").trim();
 const esc = t => String(t).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 const sem = t => (t || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+if (tipo === "cobrancas") { montarCobrancas(); return; }   // 13/11: página só de consulta
 
 const CAMPO = (id, rotulo, tipoInput = "text", extra = "") =>
   `<label for="${id}">${rotulo}</label><input id="${id}" type="${tipoInput}" ${extra}>`;
