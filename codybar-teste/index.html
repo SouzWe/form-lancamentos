@@ -188,6 +188,11 @@
   .en-cad { margin-top: 28px; }
   .en-item { margin: 14px -16px; padding: 16px; border-bottom: 0; }
   .en-item .cb-rota { right: 16px; }
+  /* 14/11 (3º ajuste): espaço claro entre as linhas de botões (💬 ↔ Saiu/Entregue ↔ número) e entre Saiu e Entregue */
+  .en-item .en-acoes { gap: 12px; margin-top: 14px; }
+  .en-item .en-acoes button { padding: 13px 4px; min-height: 46px; }
+  .en-item .cb-cel { margin-top: 16px; }
+  .en-item .cb-cel .cb-num { padding: 7px 14px; }
   .en-item.pend { background: var(--campo); }
   .en-item.pend .en-acoes button:not(.zap) { background: var(--bg); }
   .en-item.saiu { border-top: 1px solid color-mix(in srgb, var(--txt) 25%, transparent);
@@ -520,7 +525,7 @@ function montarEntregas() {
       + `<div class="en-ped">${p}</div>`
       + `<div class="cb-li">📍 ${esc([x.reg || "sem região", x.end].filter(Boolean).join(" · "))}</div>`
       + (x.cobrar > 0 ? `<div class="cb-li">💰 Cobrar: <b>${reais(x.cobrar)}</b></div>` : `<div class="cb-li en-pago">✅ Já pago</div>`)
-      + `<div class="en-st${x.saiu ? " saiu" : ""}">${st}${ent ? ` · 🚚 Entregador ${esc(nomeEnt(ent))}` : ""}</div>`
+      + `<div class="en-st${x.saiu ? " saiu" : ""}">${st}${ent ? ` · 🚚 ${esc(nomeEnt(ent))}` : ""}</div>`
       + `<div class="en-acoes"><button type="button" class="zap" data-a="zap" data-p="${p}">💬 Enviar ao entregador</button>`
       + (x.saiu ? `<button type="button" data-a="pendente" data-p="${p}">↩️ Pendente</button>`
                 : `<button type="button" data-a="saiu" data-p="${p}">🛵 Saiu</button>`)
