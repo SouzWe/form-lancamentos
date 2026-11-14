@@ -180,18 +180,18 @@
   .en-st { font-size: 14px; margin-top: 3px; font-weight: 600; }
   .en-st.saiu { color: var(--fixo); }
   .en-pago { color: var(--ok); }
-  .en-acoes { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; margin-top: 10px; }
+  .en-acoes { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 10px; }
   .en-acoes button { padding: 10px 4px; border: 1px solid transparent; border-radius: 10px; background: var(--campo);
                      color: var(--txt); font: inherit; font-size: 13px; cursor: pointer; }
   .en-acoes button.zap { grid-column: 1 / -1; border-color: var(--ok); color: var(--ok); background: none; font-weight: 600; }
-  /* 14/11 (1º teste): seleção da entrega + sempre dá para cancelar */
+  /* 14/11 (2º teste): cards sempre abertos; cor pelo status (🕓 pendente = claro, 🛵 saiu = escuro); mais espaço entre cards */
   .en-cad { margin-top: 28px; }
-  .en-topo { cursor: pointer; }
-  .en-item.sel { margin: 0 -16px; padding-left: 16px; padding-right: 16px; background: var(--campo); }
-  .en-item.sel .cb-rota { right: 16px; }
-  .en-item.sel .en-acoes button:not(.zap), .en-item.sel .cb-cancelar { background: var(--bg); }
-  .en-toque { color: var(--dica); font-size: 12px; margin-top: 4px; }
-  .en-trocar { border: 0; background: none; color: var(--btn); font: inherit; font-size: 13px; padding: 0 0 0 6px; cursor: pointer; }
+  .en-item { margin: 14px -16px; padding: 16px; border-bottom: 0; }
+  .en-item .cb-rota { right: 16px; }
+  .en-item.pend { background: var(--campo); }
+  .en-item.pend .en-acoes button:not(.zap) { background: var(--bg); }
+  .en-item.saiu { border-top: 1px solid color-mix(in srgb, var(--txt) 25%, transparent);
+                  border-bottom: 1px solid color-mix(in srgb, var(--txt) 25%, transparent); }
   .cb-cancelar { width: 100%; margin-top: 12px; padding: 12px; border: 1px solid var(--dica); border-radius: 12px;
                  background: none; color: var(--txt); font: inherit; font-size: 14px; cursor: pointer; }
   .en-form-bts { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 12px; }
@@ -315,6 +315,18 @@ function abrirRota(x, comCancelar) {   // 14/11: comCancelar = botão "✕ Cance
 // Só consulta: sem Enviar, não grava e não manda nada ao bot. Dados no link do botão:
 // c = [id, nome, região, celular, talão, vendas em aberto, talão vencido "DD/MM/AAAA", cobrança do talão,
 //      cobrança das vendas, horário dela, venda vencida (1/0), horário do talão]; r = regiões.
+// 14/11: pílula do WhatsApp do cliente — a mesma na 🗺️ Cobranças e na 🚚 Entregas.
+// Verde = celular (abre), laranja = fixo (abre), vermelho = errado, laranja "⚠️ ✖ sem número". attrs = data-* do botão.
+function pilulaCel(v, attrs, rotulo) {
+  const esc = escHtml, d = digitosNumero(v);
+  const mostraNum = d => d.length < 3 ? d : `(${d.slice(0, 2)}) ` + (d.length - 2 > 4 ? d.slice(2, d.length - 2 >= 9 ? 7 : 6) + "-" + d.slice(d.length - 2 >= 9 ? 7 : 6) : d.slice(2));
+  if (!d) return `<span class="cb-num fixo">⚠️ ✖ sem número</span>`;
+  if (erroNumeroCel(v)) return `<span class="cb-num erro">⚠️ ${esc(mostraNum(d))}</span>`;
+  const fixo = d.length === 10;
+  const fmt = fixo ? `(${d.slice(0, 2)}) ${d.slice(2, 6)}-${d.slice(6)}` : `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`;
+  return `<button type="button" class="cb-num ${fixo ? "fixo" : "ok"}" ${attrs} aria-label="${esc(rotulo)}">${fixo ? "☎️" : "💬"} ${esc(fmt)} ›</button>`;
+}
+
 function montarCobrancas() {
   const esc = t => String(t).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
   const reais = n => "R$ " + n.toFixed(2).replace(".", ",").replace(/\B(?=(\d{3})+,)/g, ".");
@@ -347,14 +359,7 @@ function montarCobrancas() {
   regioes.sort((a, b) => sem(a).localeCompare(sem(b)));
   const temSem = CLIENTES.some(c => !c[2]);
   // 13/11: o número vira o botão. Verde = celular (abre), laranja = fixo (abre), vermelho = errado, laranja "✖ sem número".
-  const mostraNum = d => d.length < 3 ? d : `(${d.slice(0, 2)}) ` + (d.length - 2 > 4 ? d.slice(2, d.length - 2 >= 9 ? 7 : 6) + "-" + d.slice(d.length - 2 >= 9 ? 7 : 6) : d.slice(2));
-  const pilula = x => {
-    const d = digitosNumero(x.cel);
-    if (!d) return `<span class="cb-num fixo">⚠️ ✖ sem número</span>`;
-    if (erroNumeroCel(x.cel)) return `<span class="cb-num erro">⚠️ ${esc(mostraNum(d))}</span>`;
-    const fixo = d.length === 10;
-    return `<button type="button" class="cb-num ${fixo ? "fixo" : "ok"}" data-id="${esc(x.id)}" aria-label="Cobrar no WhatsApp">${fixo ? "☎️" : "💬"} ${esc(cel(x.cel))} ›</button>`;
-  };
+  const pilula = x => pilulaCel(x.cel, `data-id="${esc(x.id)}"`, "Cobrar no WhatsApp");   // 14/11: função global
   // v2: nome + código → 💸 total → data → 🛒 vendas em aberto → 📒 talão → número (à direita)
   const linha = x => {
     const cod = String(x.id).replace(/\D/g, "").slice(-4);
@@ -467,7 +472,7 @@ function montarEntregas() {
     fundo.innerHTML = `<div class="cb-folha" role="dialog" aria-label="${esc(titulo)}">
       <div class="cb-folha-topo"><b>${esc(titulo)}</b><button type="button" class="cb-folha-x" aria-label="Fechar">✕</button></div>
       <div class="en-lista-ent">${ENTREGADORES.map(g => `<button type="button" data-ent="${esc(g[0])}"${g[0] === ult ? ' class="ultimo"' : ""}>🛵 ${esc(g[1])} <small>${esc(fmtCel(g[2]))}</small>${g[0] === opts.atual ? " ✓" : ""}</button>`).join("")}</div>
-      ${opts.limpar ? '<button type="button" class="cb-cancelar" data-limpar="1">Tirar a escolha do entregador</button>' : ""}
+      ${opts.limpar ? '<button type="button" class="cb-cancelar" data-limpar="1">Remover entregador</button>' : ""}
       <button type="button" class="cb-cancelar" data-cancelar="1">✕ Cancelar</button></div>`;
     const fechar = () => fundo.remove();
     fundo.onclick = e => { if (e.target === fundo) fechar(); };
@@ -485,12 +490,15 @@ function montarEntregas() {
       if (temEnd(x)) { try { copiarTexto(destino(x)); } catch (e) {} }
       abrirLink(`https://wa.me/55${digitosNumero(g[2])}?text=${encodeURIComponent(mensagem(x))}`);
       mostrar();
-    }, { atual: entDe(x) });
+    }, { atual: entDe(x),
+         // 14/11 (2º teste): trocar = abrir o 💬 e escolher outro; "Remover entregador" só com escolha feita e antes do 🛵 Saiu
+         // (a escolha é só deste aparelho; nada vai ao bot)
+         limpar: !x.saiu && !x.ent && entDe(x) ? () => { esquecerEsc(x.ped); mostrar(); } : null });
   }
-  // 14/11: trocar o entregador antes do 🛵 Saiu (só a escolha deste aparelho; nada vai ao bot)
-  function trocarEntregador(x) {
-    escolherEntregador(`🔁 Entregador da entrega de ${x.nome}`, g => { guardarEsc(x.ped, g[0]); mostrar(); },
-      { atual: entDe(x), limpar: () => { esquecerEsc(x.ped); mostrar(); } });
+  // 💬 do cliente (14/11): abre a conversa com ele, sem texto pronto
+  function abrirCliente(x) {
+    const d = digitosNumero(x.cel);
+    if (d) abrirLink(`https://wa.me/55${d}`);
   }
   function status(x, st) {
     const ent = entDe(x);
@@ -500,30 +508,24 @@ function montarEntregas() {
     }
     enviarBot(st === "pendente" ? `🚚 ENTREGA ${x.ped}: pendente` : `🚚 ENTREGA ${x.ped}: ${st}${ent ? " · " + ent : ""}`);
   }
-  // 14/11 (1º teste): toque na entrega = seleciona (aparecem as ações); toque de novo ou ✕ Fechar = desmarca.
-  // Uma selecionada por vez: tocar em outra troca a seleção.
-  let selecionada = "";
+  // 14/11 (2º teste): card sempre aberto, sem seleção. Claro = 🕓 pendente; escuro = 🛵 saiu.
+  // Ordem: nome+código (🗺️ no canto) → pedido → 📍 → 💰 → status · 🚚 entregador → 💬 → 🛵/✅ → WhatsApp do cliente (à direita)
   const cartao = x => {
-    const cod = String(x.cli).replace(/\D/g, "").slice(-4), ent = entDe(x), sel = x.ped === selecionada;
-    const rota = temEnd(x) ? `<button type="button" class="cb-rota" data-rota="${esc(x.ped)}" aria-label="Rota até o cliente">🗺️</button>`
+    const cod = String(x.cli).replace(/\D/g, "").slice(-4), ent = entDe(x), p = esc(x.ped);
+    const rota = temEnd(x) ? `<button type="button" class="cb-rota" data-rota="${p}" aria-label="Rota até o cliente">🗺️</button>`
       : `<span class="cb-rota off" aria-label="Sem endereço">🗺️</span>`;
-    const podeTrocar = sel && !x.saiu && !x.ent && ENTREGADORES.length;
-    return `<div class="en-item${sel ? " sel" : ""}">${rota}<div class="en-topo" data-sel="${esc(x.ped)}">`
+    const st = x.saiu ? `🛵 saiu ${esc(x.saida)}` : "🕓 pendente";
+    return `<div class="en-item ${x.saiu ? "saiu" : "pend"}">${rota}`
       + `<div class="cb-nome">${esc(x.nome)} ${esc(cod)}</div>`
-      + `<div class="en-ped">${esc(x.ped)}</div>`
+      + `<div class="en-ped">${p}</div>`
       + `<div class="cb-li">📍 ${esc([x.reg || "sem região", x.end].filter(Boolean).join(" · "))}</div>`
       + (x.cobrar > 0 ? `<div class="cb-li">💰 Cobrar: <b>${reais(x.cobrar)}</b></div>` : `<div class="cb-li en-pago">✅ Já pago</div>`)
-      + (x.saiu ? `<div class="en-st saiu">🛵 saiu ${esc(x.saida)}</div>` : `<div class="en-st">🕓 pendente</div>`)
-      + `</div>`
-      + (ent || podeTrocar ? `<div class="cb-li">🚚 ${ent ? esc(nomeEnt(ent)) : "sem entregador escolhido"}`
-          + (podeTrocar ? `<button type="button" class="en-trocar" data-a="trocar" data-p="${esc(x.ped)}">${ent ? "trocar entregador" : "escolher"}</button>` : "") + `</div>` : "")
-      + (!sel ? `<div class="en-toque">Toque para ver as ações</div>`
-        : `<div class="en-acoes"><button type="button" class="zap" data-a="zap" data-p="${esc(x.ped)}">💬 Enviar ao entregador</button>`
-          + (x.saiu ? `<button type="button" data-a="pendente" data-p="${esc(x.ped)}">↩️ Pendente</button>`
-                    : `<button type="button" data-a="saiu" data-p="${esc(x.ped)}">🛵 Saiu</button>`)
-          + `<button type="button" data-a="entregue" data-p="${esc(x.ped)}">✅ Entregue</button>`
-          + `<button type="button" data-a="rota" data-p="${esc(x.ped)}"${temEnd(x) ? "" : " disabled"}>🗺️ Rota</button></div>`
-          + `<button type="button" class="cb-cancelar" data-a="fechar" data-p="${esc(x.ped)}">✕ Fechar (escolher outra entrega)</button>`)
+      + `<div class="en-st${x.saiu ? " saiu" : ""}">${st}${ent ? ` · 🚚 Entregador ${esc(nomeEnt(ent))}` : ""}</div>`
+      + `<div class="en-acoes"><button type="button" class="zap" data-a="zap" data-p="${p}">💬 Enviar ao entregador</button>`
+      + (x.saiu ? `<button type="button" data-a="pendente" data-p="${p}">↩️ Pendente</button>`
+                : `<button type="button" data-a="saiu" data-p="${p}">🛵 Saiu</button>`)
+      + `<button type="button" data-a="entregue" data-p="${p}">✅ Entregue</button></div>`
+      + `<div class="cb-cel">${pilulaCel(x.cel, `data-cli="${p}"`, "Abrir a conversa com o cliente no WhatsApp")}</div>`
       + `</div>`;
   };
   function mostrar() {
@@ -532,12 +534,10 @@ function montarEntregas() {
     const achar = p => lista.find(x => x.ped === p);
     const rota = x => abrirRota({ nome: x.nome, end: x.end, reg: x.reg, cep: x.cep }, true);
     el.querySelectorAll("button.cb-rota[data-rota]").forEach(b => b.onclick = () => rota(achar(b.dataset.rota)));
-    el.querySelectorAll("[data-sel]").forEach(d => d.onclick = () => { selecionada = selecionada === d.dataset.sel ? "" : d.dataset.sel; mostrar(); });
+    el.querySelectorAll("button.cb-num[data-cli]").forEach(b => b.onclick = () => abrirCliente(achar(b.dataset.cli)));
     el.querySelectorAll("[data-a]").forEach(b => b.onclick = () => {
       const x = achar(b.dataset.p), a = b.dataset.a;
-      if (a === "fechar") { selecionada = ""; mostrar(); }
-      else if (a === "trocar") trocarEntregador(x);
-      else if (a === "zap") mandarAoEntregador(x); else if (a === "rota") rota(x); else status(x, a);
+      if (a === "zap") mandarAoEntregador(x); else status(x, a);
     });
   }
   // + Entregador (E3): nome + WhatsApp — mesma regra e cores do campo WhatsApp dos formulários; vai ao bot com prévia e "sim"
