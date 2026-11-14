@@ -196,6 +196,20 @@
   /* 15/11: 🕓 pendente = cor padrão do Telegram (fundo da página) com contorno; 🛵 saiu = cor secundária escura (preenchido) */
   .en-acoes button.en-sel { grid-column: 1 / -1; }
   .en-acoes button:disabled { opacity: .55; cursor: default; }
+  /* 15/11: folha 💰 Pagamento na entrega (abre no ✅ Entregue quando há valor a cobrar) */
+  .pg-folha { max-height: 92vh; overflow-y: auto; }
+  .pg-cobrar { font-size: 14px; margin-bottom: 12px; }
+  .pg-op { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .pg-op button, .pg-chips button { border: 1px solid transparent; background: var(--campo); color: var(--txt);
+    font: inherit; cursor: pointer; }
+  .pg-op button { padding: 13px 8px; border-radius: 12px; font-size: 15px; }
+  .pg-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+  .pg-chips button { padding: 8px 14px; border-radius: 999px; font-size: 14px; }
+  .pg-op button.on, .pg-chips button.on { background: var(--btn); color: var(--btn-txt); font-weight: 600; }
+  .pg-erro { color: var(--erro); font-size: 14px; font-weight: 600; margin-top: 10px; }
+  .pg-erro:empty { display: none; }
+  .pg-ok { width: 100%; margin-top: 14px; padding: 13px; border: 0; border-radius: 12px; background: var(--btn);
+    color: var(--btn-txt); font: 600 16px/1.2 inherit; cursor: pointer; }
   .en-item.pend { background: var(--bg); border-top: 1px solid color-mix(in srgb, var(--txt) 25%, transparent);
                   border-bottom: 1px solid color-mix(in srgb, var(--txt) 25%, transparent); }
   .en-item.saiu { background: var(--campo); border-top: 0; border-bottom: 0; }
@@ -517,12 +531,93 @@ function montarEntregas() {
     card.querySelectorAll('[data-a="saiu"],[data-a="entregue"],[data-a="pendente"]').forEach(o => { o.disabled = true; });
     b.textContent = "⏳ aguarde…";
   }
+  // 15/11: ✅ Entregue com valor a cobrar → folha "💰 Pagamento na entrega" (ela é a confirmação, como o "sim").
+  // 💵 Recebeu (valor = restante, editável + forma obrigatória) ou ⏳ Não recebeu; se faltar algo: motivo + nova data
+  // (horário opcional). 📝 Observação opcional. ✕ Cancelar / ✕ / toque fora = nada gravado. Números finais: do motor.
+  const MOTIVOS = ["vai pagar depois", "sem dinheiro agora", "pix/cartão não passou", "outro"];
+  const FORMAS = [["dinheiro", "💵 Dinheiro"], ["pix", "⚡ Pix"], ["cartão", "💳 Cartão"]];
+  const virgula = n => Number(n).toFixed(2).replace(".", ",");
+  const lerValor = s => { s = String(s || "").trim().replace(/^R\$\s*/i, ""); if (!s) return NaN;
+    if (s.includes(",")) s = s.replace(/\./g, "").replace(",", "."); return /^\d+(\.\d{1,2})?$/.test(s) ? Number(s) : NaN; };
+  // (a página de Entregas não carrega os helpers dos formulários: hoje e horários locais)
+  const hojeLocal = () => { const d = new Date(); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); return d.toISOString().slice(0, 10); };
+  const HORAS_PG = []; for (let m = 8 * 60; m <= 20 * 60; m += 30) HORAS_PG.push(String(Math.floor(m / 60)).padStart(2, "0") + ":" + String(m % 60).padStart(2, "0"));
+  function pagamentoEntrega(x, confirmar) {
+    const fundo = document.createElement("div");
+    fundo.className = "cb-fundo";
+    const chips = (nome, ops) => `<div class="pg-chips" data-g="${nome}">${ops.map(([v, r]) => `<button type="button" data-v="${esc(v)}">${esc(r)}</button>`).join("")}</div>`;
+    fundo.innerHTML = `<div class="cb-folha pg-folha" role="dialog" aria-label="Pagamento na entrega">
+      <div class="cb-folha-topo"><b>💰 Pagamento na entrega</b><button type="button" class="cb-folha-x" aria-label="Fechar">✕</button></div>
+      <div class="pg-cobrar">${esc(x.nome)} · ${esc(x.ped)}<br>A cobrar: <b>${reais(x.cobrar)}</b></div>
+      <div class="pg-op"><button type="button" data-op="sim">💵 Recebeu</button><button type="button" data-op="nao">⏳ Não recebeu</button></div>
+      <div id="pg_rec" hidden><label for="pg_valor">Valor recebido *</label>
+        <input id="pg_valor" type="text" inputmode="decimal" value="${virgula(x.cobrar)}">
+        <label>Forma *</label>${chips("forma", FORMAS)}</div>
+      <div id="pg_falta" hidden><label>Motivo *</label>${chips("motivo", MOTIVOS.map(m => [m, m]))}
+        <div class="dupla"><div><label for="pg_data">Nova data de cobrança *</label><input id="pg_data" type="date" min="${hojeLocal()}"></div>
+        <div><label for="pg_hora">Horário</label><select id="pg_hora"><option value="">— (sem horário)</option>${HORAS_PG.map(h => `<option>${h}</option>`).join("")}</select></div></div></div>
+      <div id="pg_obs_caixa" hidden><label for="pg_obs">📝 Observação (opcional)</label>
+        <textarea id="pg_obs" maxlength="200" placeholder="ex.: cliente pediu pra passar sexta"></textarea></div>
+      <div class="pg-erro" id="pg_erro"></div>
+      <button type="button" class="pg-ok" id="pg_ok" hidden>✅ Confirmar entrega</button>
+      <button type="button" class="cb-cancelar" data-cancelar="1">✕ Cancelar</button></div>`;
+    const $f = s => fundo.querySelector(s);
+    let op = "", forma = "", motivo = "";
+    const fechar = () => fundo.remove();
+    const erro = t => { $f("#pg_erro").textContent = t; };
+    // a parte "falta" aparece no ⏳ Não recebeu e no 💵 Recebeu com valor menor que o restante
+    const atualizar = () => {
+      const v = lerValor($f("#pg_valor").value);
+      fundo.querySelectorAll("[data-op]").forEach(b => b.classList.toggle("on", b.dataset.op === op));
+      $f("#pg_rec").hidden = op !== "sim";
+      $f("#pg_falta").hidden = !(op === "nao" || (op === "sim" && v >= 0 && v < x.cobrar - 0.005));
+      $f("#pg_obs_caixa").hidden = $f("#pg_ok").hidden = !op;
+      fundo.querySelectorAll('[data-date], input[type=date], select').forEach(el => el.classList.toggle("vazio", !el.value));
+    };
+    fundo.onclick = e => { if (e.target === fundo) fechar(); };
+    $f(".cb-folha-x").onclick = fechar;
+    $f("[data-cancelar]").onclick = fechar;
+    fundo.querySelectorAll("[data-op]").forEach(b => b.onclick = () => { op = b.dataset.op; erro(""); atualizar(); });
+    fundo.querySelectorAll(".pg-chips").forEach(g => g.querySelectorAll("button").forEach(b => b.onclick = () => {
+      g.querySelectorAll("button").forEach(o => o.classList.toggle("on", o === b));
+      if (g.dataset.g === "forma") forma = b.dataset.v; else motivo = b.dataset.v;
+      erro("");
+    }));
+    $f("#pg_valor").oninput = () => { erro(""); atualizar(); };
+    $f("#pg_data").onchange = $f("#pg_hora").onchange = () => { erro(""); atualizar(); };
+    $f("#pg_ok").onclick = () => {
+      const rec = op === "sim" ? lerValor($f("#pg_valor").value) : 0;
+      if (op === "sim") {
+        if (!(rec > 0)) { erro("Informe o valor recebido (ou toque em ⏳ Não recebeu)."); $f("#pg_valor").focus(); return; }
+        if (rec > x.cobrar + 0.005) { erro(`O valor passa do que falta receber (${reais(x.cobrar)}).`); $f("#pg_valor").focus(); return; }
+        if (!forma) { erro("Escolha a forma: dinheiro, pix ou cartão."); return; }
+      }
+      const falta = rec < x.cobrar - 0.005, dIso = $f("#pg_data").value, hora = $f("#pg_hora").value;
+      if (falta) {
+        if (!motivo) { erro("Escolha o motivo."); return; }
+        if (!dIso) { erro("Escolha a nova data de cobrança."); $f("#pg_data").focus(); return; }
+        if (dIso < hojeLocal()) { erro("A nova data de cobrança já passou."); return; }
+      }
+      const obs = $f("#pg_obs").value.replace(/\s+/g, " ").trim();
+      const partes = [`💰 recebeu ${virgula(rec)}${rec > 0 ? " no " + forma : ""}`];
+      if (falta) partes.push(`motivo: ${motivo}`, `cobrança: ${dIso.split("-").reverse().join("/")}${hora ? " " + hora : ""}`);
+      if (obs) partes.push(`obs: ${obs}`);
+      fechar();
+      confirmar(partes.join(" · "));
+    };
+    document.body.appendChild(fundo);
+    atualizar();
+  }
   function status(x, st, b) {
     if (enviando.has(x.ped)) return;
     // 15/11: ✅ Entregue só depois do 🛵 Saiu (o motor também recusa)
     if (st === "entregue" && !x.saiu) { aviso("Marque 🛵 Saiu primeiro (com o entregador selecionado)."); return; }
     const ent = entDe(x);
     const mandar = texto => { enviando.add(x.ped); if (b) travar(b); enviarBot(texto); };
+    if (st === "entregue" && x.cobrar > 0) {
+      pagamentoEntrega(x, pg => mandar(`🚚 ENTREGA ${x.ped}: entregue${ent ? " · " + ent : ""} · ${pg}`));
+      return;
+    }
     if (st === "saiu" && !ent) {
       escolherEntregador(`🛵 Quem saiu com a entrega de ${x.nome}?`, g => { guardarEsc(x.ped, g[0]); mandar(`🚚 ENTREGA ${x.ped}: saiu · ${g[0]}`); });
       return;
