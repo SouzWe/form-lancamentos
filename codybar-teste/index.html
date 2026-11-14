@@ -193,10 +193,12 @@
   .en-item .en-acoes button { padding: 13px 4px; min-height: 46px; }
   .en-item .cb-cel { margin-top: 16px; }
   .en-item .cb-cel .cb-num { padding: 7px 14px; }
-  .en-item.pend { background: var(--campo); }
-  .en-item.pend .en-acoes button:not(.zap) { background: var(--bg); }
-  .en-item.saiu { border-top: 1px solid color-mix(in srgb, var(--txt) 25%, transparent);
+  /* 15/11: 🕓 pendente = cor padrão do Telegram (fundo da página) com contorno; 🛵 saiu = cor secundária escura (preenchido) */
+  .en-acoes button.en-sel { grid-column: 1 / -1; }
+  .en-item.pend { background: var(--bg); border-top: 1px solid color-mix(in srgb, var(--txt) 25%, transparent);
                   border-bottom: 1px solid color-mix(in srgb, var(--txt) 25%, transparent); }
+  .en-item.saiu { background: var(--campo); border-top: 0; border-bottom: 0; }
+  .en-item.saiu .en-acoes button:not(.zap) { background: var(--bg); }
   .cb-cancelar { width: 100%; margin-top: 12px; padding: 12px; border: 1px solid var(--dica); border-radius: 12px;
                  background: none; color: var(--txt); font: inherit; font-size: 14px; cursor: pointer; }
   .en-form-bts { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 12px; }
@@ -489,16 +491,18 @@ function montarEntregas() {
   }
   const esquecerEsc = p => { try { localStorage.removeItem(CHAVE + p); } catch (e) {} };
   // 💬 Enviar ao entregador: abre o WhatsApp NO NÚMERO DELE com a mensagem pronta e copia o endereço (não envia sozinho)
+  // 15/11: escolher ≠ enviar. "🚚 Enviar ao <nome>" só aparece com entregador escolhido e abre direto o WhatsApp dele.
   function mandarAoEntregador(x) {
-    escolherEntregador(`💬 Enviar a entrega de ${x.nome} para…`, g => {
-      guardarEsc(x.ped, g[0]);
-      if (temEnd(x)) { try { copiarTexto(destino(x)); } catch (e) {} }
-      abrirLink(`https://wa.me/55${digitosNumero(g[2])}?text=${encodeURIComponent(mensagem(x))}`);
-      mostrar();
-    }, { atual: entDe(x),
-         // 14/11 (2º teste): trocar = abrir o 💬 e escolher outro; "Remover entregador" só com escolha feita e antes do 🛵 Saiu
-         // (a escolha é só deste aparelho; nada vai ao bot)
-         limpar: !x.saiu && !x.ent && entDe(x) ? () => { esquecerEsc(x.ped); mostrar(); } : null });
+    const g = ENTREGADORES.find(g => g[0] === entDe(x));
+    if (!g) { selecionarEntregador(x); return; }
+    if (temEnd(x)) { try { copiarTexto(destino(x)); } catch (e) {} }
+    abrirLink(`https://wa.me/55${digitosNumero(g[2])}?text=${encodeURIComponent(mensagem(x))}`);
+  }
+  // "👤 Selecionar entregador": só grava a escolha (neste aparelho; nada vai ao bot) e NÃO abre o WhatsApp.
+  // "Remover entregador" só com escolha feita e antes do 🛵 Saiu.
+  function selecionarEntregador(x) {
+    escolherEntregador(`👤 Entregador da entrega de ${x.nome}`, g => { guardarEsc(x.ped, g[0]); mostrar(); },
+      { atual: entDe(x), limpar: !x.saiu && !x.ent && entDe(x) ? () => { esquecerEsc(x.ped); mostrar(); } : null });
   }
   // 💬 do cliente (14/11): abre a conversa com ele, sem texto pronto
   function abrirCliente(x) {
@@ -525,8 +529,10 @@ function montarEntregas() {
       + `<div class="en-ped">${p}</div>`
       + `<div class="cb-li">📍 ${esc([x.reg || "sem região", x.end].filter(Boolean).join(" · "))}</div>`
       + (x.cobrar > 0 ? `<div class="cb-li">💰 Cobrar: <b>${reais(x.cobrar)}</b></div>` : `<div class="cb-li en-pago">✅ Já pago</div>`)
-      + `<div class="en-st${x.saiu ? " saiu" : ""}">${st}${ent ? ` · 🚚 ${esc(nomeEnt(ent))}` : ""}</div>`
-      + `<div class="en-acoes"><button type="button" class="zap" data-a="zap" data-p="${p}">💬 Enviar ao entregador</button>`
+      + `<div class="en-st${x.saiu ? " saiu" : ""}">${st}</div>`
+      + `<div class="en-acoes">`
+      + (ent ? `<button type="button" class="zap" data-a="zap" data-p="${p}">🚚 Enviar ao ${esc(nomeEnt(ent))}</button>` : "")
+      + `<button type="button" class="en-sel" data-a="sel" data-p="${p}">👤 Selecionar entregador</button>`
       + (x.saiu ? `<button type="button" data-a="pendente" data-p="${p}">↩️ Pendente</button>`
                 : `<button type="button" data-a="saiu" data-p="${p}">🛵 Saiu</button>`)
       + `<button type="button" data-a="entregue" data-p="${p}">✅ Entregue</button></div>`
@@ -542,7 +548,7 @@ function montarEntregas() {
     el.querySelectorAll("button.cb-num[data-cli]").forEach(b => b.onclick = () => abrirCliente(achar(b.dataset.cli)));
     el.querySelectorAll("[data-a]").forEach(b => b.onclick = () => {
       const x = achar(b.dataset.p), a = b.dataset.a;
-      if (a === "zap") mandarAoEntregador(x); else status(x, a);
+      if (a === "zap") mandarAoEntregador(x); else if (a === "sel") selecionarEntregador(x); else status(x, a);
     });
   }
   // + Entregador (E3): nome + WhatsApp — mesma regra e cores do campo WhatsApp dos formulários; vai ao bot com prévia e "sim"
