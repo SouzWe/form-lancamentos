@@ -195,6 +195,7 @@
   .en-item .cb-cel .cb-num { padding: 7px 14px; }
   /* 15/11: 🕓 pendente = cor padrão do Telegram (fundo da página) com contorno; 🛵 saiu = cor secundária escura (preenchido) */
   .en-acoes button.en-sel { grid-column: 1 / -1; }
+  .en-acoes button:disabled { opacity: .55; cursor: default; }
   .en-item.pend { background: var(--bg); border-top: 1px solid color-mix(in srgb, var(--txt) 25%, transparent);
                   border-bottom: 1px solid color-mix(in srgb, var(--txt) 25%, transparent); }
   .en-item.saiu { background: var(--campo); border-top: 0; border-bottom: 0; }
@@ -509,13 +510,24 @@ function montarEntregas() {
     const d = digitosNumero(x.cel);
     if (d) abrirLink(`https://wa.me/55${d}`);
   }
-  function status(x, st) {
+  // 15/11: depois do 1º toque, 🛵/✅/↩️ do card ficam desativados e o tocado vira "⏳ aguarde…" (evita gravar 2×)
+  const enviando = new Set();
+  function travar(b) {
+    const card = b.closest(".en-item");
+    card.querySelectorAll('[data-a="saiu"],[data-a="entregue"],[data-a="pendente"]').forEach(o => { o.disabled = true; });
+    b.textContent = "⏳ aguarde…";
+  }
+  function status(x, st, b) {
+    if (enviando.has(x.ped)) return;
+    // 15/11: ✅ Entregue só depois do 🛵 Saiu (o motor também recusa)
+    if (st === "entregue" && !x.saiu) { aviso("Marque 🛵 Saiu primeiro (com o entregador selecionado)."); return; }
     const ent = entDe(x);
+    const mandar = texto => { enviando.add(x.ped); if (b) travar(b); enviarBot(texto); };
     if (st === "saiu" && !ent) {
-      escolherEntregador(`🛵 Quem saiu com a entrega de ${x.nome}?`, g => { guardarEsc(x.ped, g[0]); enviarBot(`🚚 ENTREGA ${x.ped}: saiu · ${g[0]}`); });
+      escolherEntregador(`🛵 Quem saiu com a entrega de ${x.nome}?`, g => { guardarEsc(x.ped, g[0]); mandar(`🚚 ENTREGA ${x.ped}: saiu · ${g[0]}`); });
       return;
     }
-    enviarBot(st === "pendente" ? `🚚 ENTREGA ${x.ped}: pendente` : `🚚 ENTREGA ${x.ped}: ${st}${ent ? " · " + ent : ""}`);
+    mandar(st === "pendente" ? `🚚 ENTREGA ${x.ped}: pendente` : `🚚 ENTREGA ${x.ped}: ${st}${ent ? " · " + ent : ""}`);
   }
   // 14/11 (2º teste): card sempre aberto, sem seleção. Claro = 🕓 pendente; escuro = 🛵 saiu.
   // Ordem: nome+código (🗺️ no canto) → pedido → 📍 → 💰 → status · 🚚 entregador → 💬 → 🛵/✅ → WhatsApp do cliente (à direita)
@@ -548,7 +560,7 @@ function montarEntregas() {
     el.querySelectorAll("button.cb-num[data-cli]").forEach(b => b.onclick = () => abrirCliente(achar(b.dataset.cli)));
     el.querySelectorAll("[data-a]").forEach(b => b.onclick = () => {
       const x = achar(b.dataset.p), a = b.dataset.a;
-      if (a === "zap") mandarAoEntregador(x); else if (a === "sel") selecionarEntregador(x); else status(x, a);
+      if (a === "zap") mandarAoEntregador(x); else if (a === "sel") selecionarEntregador(x); else status(x, a, b);
     });
   }
   // + Entregador (E3): nome + WhatsApp — mesma regra e cores do campo WhatsApp dos formulários; vai ao bot com prévia e "sim"
