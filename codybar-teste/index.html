@@ -184,6 +184,18 @@
   .en-acoes button { padding: 10px 4px; border: 1px solid transparent; border-radius: 10px; background: var(--campo);
                      color: var(--txt); font: inherit; font-size: 13px; cursor: pointer; }
   .en-acoes button.zap { grid-column: 1 / -1; border-color: var(--ok); color: var(--ok); background: none; font-weight: 600; }
+  /* 14/11 (1º teste): seleção da entrega + sempre dá para cancelar */
+  .en-cad { margin-top: 28px; }
+  .en-topo { cursor: pointer; }
+  .en-item.sel { margin: 0 -16px; padding-left: 16px; padding-right: 16px; background: var(--campo); }
+  .en-item.sel .cb-rota { right: 16px; }
+  .en-item.sel .en-acoes button:not(.zap), .en-item.sel .cb-cancelar { background: var(--bg); }
+  .en-toque { color: var(--dica); font-size: 12px; margin-top: 4px; }
+  .en-trocar { border: 0; background: none; color: var(--btn); font: inherit; font-size: 13px; padding: 0 0 0 6px; cursor: pointer; }
+  .cb-cancelar { width: 100%; margin-top: 12px; padding: 12px; border: 1px solid var(--dica); border-radius: 12px;
+                 background: none; color: var(--txt); font: inherit; font-size: 14px; cursor: pointer; }
+  .en-form-bts { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 12px; }
+  .en-form-bts .en-salvar, .en-form-bts .cb-cancelar { margin-top: 0; }
   .en-lista-ent { display: grid; gap: 8px; }
   .en-lista-ent button { padding: 12px; border: 0; border-radius: 12px; background: var(--campo); color: var(--txt);
                          font: inherit; text-align: left; cursor: pointer; }
@@ -271,7 +283,7 @@ function copiarTexto(txt) {
   if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(txt).then(() => fim(true), () => fim(reserva()));
   else fim(reserva());
 }
-function abrirRota(x) {
+function abrirRota(x, comCancelar) {   // 14/11: comCancelar = botão "✕ Cancelar" embaixo (🚚 Entregas)
   if (!x || (!x.end && !x.cep)) return;
   const cep = x.cep.length === 8 ? x.cep.slice(0, 5) + "-" + x.cep.slice(5) : x.cep;
   const destino = [x.end, x.reg, cep].filter(Boolean).join(", ");   // o mesmo de antes
@@ -290,10 +302,11 @@ function abrirRota(x) {
   fundo.className = "cb-fundo";
   fundo.innerHTML = `<div class="cb-folha" role="dialog" aria-label="Rota até ${escHtml(x.nome)}">
     <div class="cb-folha-topo"><b>🗺️ Rota até ${escHtml(x.nome)}</b><button type="button" class="cb-folha-x" aria-label="Fechar">✕</button></div>
-    <div class="cb-apps">${bt("waze", "🚗 Waze")}${bt("maps", "📍 Google Maps")}${bt("copiar", "📋 Copiar endereço")}${bt("whats", "💬 Mandar no WhatsApp")}</div></div>`;
+    <div class="cb-apps">${bt("waze", "🚗 Waze")}${bt("maps", "📍 Google Maps")}${bt("copiar", "📋 Copiar endereço")}${bt("whats", "💬 Mandar no WhatsApp")}</div>${comCancelar ? '<button type="button" class="cb-cancelar">✕ Cancelar</button>' : ""}</div>`;
   const fechar = () => fundo.remove();
   fundo.onclick = e => { if (e.target === fundo) fechar(); };
   fundo.querySelector(".cb-folha-x").onclick = fechar;
+  if (comCancelar) fundo.querySelector(".cb-cancelar").onclick = fechar;
   fundo.querySelectorAll("[data-app]").forEach(b => b.onclick = () => { guardarApp(b.dataset.app); fechar(); acoes[b.dataset.app](); });
   document.body.appendChild(fundo);
 }
@@ -443,21 +456,28 @@ function montarEntregas() {
     if (tg && tg.platform && tg.platform !== "unknown") { tg.sendData(texto); return; }   // fecha a janela e manda ao bot
     $("#saida").hidden = false; $("#saida").textContent = texto;                           // fora do Telegram: só mostra
   }
-  // folha de baixo com os entregadores (mesmo visual da escolha do app da rota)
-  function escolherEntregador(titulo, depois) {
-    if (!ENTREGADORES.length) { aviso("Nenhum entregador cadastrado: use + Entregador."); abrirCadastro(); return; }
-    let ult = ""; try { ult = localStorage.getItem(CHAVE + "ultimo") || ""; } catch (e) {}
+  // folha de baixo com os entregadores (mesmo visual da escolha do app da rota).
+  // 14/11: ✕ no topo, "✕ Cancelar" embaixo e toque fora fecham sem fazer nada; opts.atual = entregador já escolhido
+  // (aparece marcado) e opts.limpar = mostra "Tirar a escolha".
+  function escolherEntregador(titulo, depois, opts = {}) {
+    if (!ENTREGADORES.length) { aviso("Nenhum entregador cadastrado: use + Entregador (no fim da página)."); abrirCadastro(); return; }
+    let ult = opts.atual || ""; if (!ult) { try { ult = localStorage.getItem(CHAVE + "ultimo") || ""; } catch (e) {} }
     const fundo = document.createElement("div");
     fundo.className = "cb-fundo";
     fundo.innerHTML = `<div class="cb-folha" role="dialog" aria-label="${esc(titulo)}">
       <div class="cb-folha-topo"><b>${esc(titulo)}</b><button type="button" class="cb-folha-x" aria-label="Fechar">✕</button></div>
-      <div class="en-lista-ent">${ENTREGADORES.map(g => `<button type="button" data-ent="${esc(g[0])}"${g[0] === ult ? ' class="ultimo"' : ""}>🛵 ${esc(g[1])} <small>${esc(fmtCel(g[2]))}</small></button>`).join("")}</div></div>`;
+      <div class="en-lista-ent">${ENTREGADORES.map(g => `<button type="button" data-ent="${esc(g[0])}"${g[0] === ult ? ' class="ultimo"' : ""}>🛵 ${esc(g[1])} <small>${esc(fmtCel(g[2]))}</small>${g[0] === opts.atual ? " ✓" : ""}</button>`).join("")}</div>
+      ${opts.limpar ? '<button type="button" class="cb-cancelar" data-limpar="1">Tirar a escolha do entregador</button>' : ""}
+      <button type="button" class="cb-cancelar" data-cancelar="1">✕ Cancelar</button></div>`;
     const fechar = () => fundo.remove();
     fundo.onclick = e => { if (e.target === fundo) fechar(); };
     fundo.querySelector(".cb-folha-x").onclick = fechar;
+    fundo.querySelector("[data-cancelar]").onclick = fechar;
+    if (opts.limpar) fundo.querySelector("[data-limpar]").onclick = () => { fechar(); opts.limpar(); };
     fundo.querySelectorAll("[data-ent]").forEach(b => b.onclick = () => { fechar(); depois(ENTREGADORES.find(g => g[0] === b.dataset.ent)); });
     document.body.appendChild(fundo);
   }
+  const esquecerEsc = p => { try { localStorage.removeItem(CHAVE + p); } catch (e) {} };
   // 💬 Enviar ao entregador: abre o WhatsApp NO NÚMERO DELE com a mensagem pronta e copia o endereço (não envia sozinho)
   function mandarAoEntregador(x) {
     escolherEntregador(`💬 Enviar a entrega de ${x.nome} para…`, g => {
@@ -465,7 +485,12 @@ function montarEntregas() {
       if (temEnd(x)) { try { copiarTexto(destino(x)); } catch (e) {} }
       abrirLink(`https://wa.me/55${digitosNumero(g[2])}?text=${encodeURIComponent(mensagem(x))}`);
       mostrar();
-    });
+    }, { atual: entDe(x) });
+  }
+  // 14/11: trocar o entregador antes do 🛵 Saiu (só a escolha deste aparelho; nada vai ao bot)
+  function trocarEntregador(x) {
+    escolherEntregador(`🔁 Entregador da entrega de ${x.nome}`, g => { guardarEsc(x.ped, g[0]); mostrar(); },
+      { atual: entDe(x), limpar: () => { esquecerEsc(x.ped); mostrar(); } });
   }
   function status(x, st) {
     const ent = entDe(x);
@@ -475,31 +500,44 @@ function montarEntregas() {
     }
     enviarBot(st === "pendente" ? `🚚 ENTREGA ${x.ped}: pendente` : `🚚 ENTREGA ${x.ped}: ${st}${ent ? " · " + ent : ""}`);
   }
+  // 14/11 (1º teste): toque na entrega = seleciona (aparecem as ações); toque de novo ou ✕ Fechar = desmarca.
+  // Uma selecionada por vez: tocar em outra troca a seleção.
+  let selecionada = "";
   const cartao = x => {
-    const cod = String(x.cli).replace(/\D/g, "").slice(-4), ent = entDe(x);
+    const cod = String(x.cli).replace(/\D/g, "").slice(-4), ent = entDe(x), sel = x.ped === selecionada;
     const rota = temEnd(x) ? `<button type="button" class="cb-rota" data-rota="${esc(x.ped)}" aria-label="Rota até o cliente">🗺️</button>`
       : `<span class="cb-rota off" aria-label="Sem endereço">🗺️</span>`;
-    return `<div class="en-item">${rota}<div class="cb-nome">${esc(x.nome)} ${esc(cod)}</div>`
+    const podeTrocar = sel && !x.saiu && !x.ent && ENTREGADORES.length;
+    return `<div class="en-item${sel ? " sel" : ""}">${rota}<div class="en-topo" data-sel="${esc(x.ped)}">`
+      + `<div class="cb-nome">${esc(x.nome)} ${esc(cod)}</div>`
       + `<div class="en-ped">${esc(x.ped)}</div>`
       + `<div class="cb-li">📍 ${esc([x.reg || "sem região", x.end].filter(Boolean).join(" · "))}</div>`
       + (x.cobrar > 0 ? `<div class="cb-li">💰 Cobrar: <b>${reais(x.cobrar)}</b></div>` : `<div class="cb-li en-pago">✅ Já pago</div>`)
       + (x.saiu ? `<div class="en-st saiu">🛵 saiu ${esc(x.saida)}</div>` : `<div class="en-st">🕓 pendente</div>`)
-      + (ent ? `<div class="cb-li">🚚 ${esc(nomeEnt(ent))}</div>` : "")
-      + `<div class="en-acoes"><button type="button" class="zap" data-a="zap" data-p="${esc(x.ped)}">💬 Enviar ao entregador</button>`
-      + (x.saiu ? `<button type="button" data-a="pendente" data-p="${esc(x.ped)}">↩️ Pendente</button>`
-                : `<button type="button" data-a="saiu" data-p="${esc(x.ped)}">🛵 Saiu</button>`)
-      + `<button type="button" data-a="entregue" data-p="${esc(x.ped)}">✅ Entregue</button>`
-      + `<button type="button" data-a="rota" data-p="${esc(x.ped)}"${temEnd(x) ? "" : " disabled"}>🗺️ Rota</button></div></div>`;
+      + `</div>`
+      + (ent || podeTrocar ? `<div class="cb-li">🚚 ${ent ? esc(nomeEnt(ent)) : "sem entregador escolhido"}`
+          + (podeTrocar ? `<button type="button" class="en-trocar" data-a="trocar" data-p="${esc(x.ped)}">${ent ? "trocar entregador" : "escolher"}</button>` : "") + `</div>` : "")
+      + (!sel ? `<div class="en-toque">Toque para ver as ações</div>`
+        : `<div class="en-acoes"><button type="button" class="zap" data-a="zap" data-p="${esc(x.ped)}">💬 Enviar ao entregador</button>`
+          + (x.saiu ? `<button type="button" data-a="pendente" data-p="${esc(x.ped)}">↩️ Pendente</button>`
+                    : `<button type="button" data-a="saiu" data-p="${esc(x.ped)}">🛵 Saiu</button>`)
+          + `<button type="button" data-a="entregue" data-p="${esc(x.ped)}">✅ Entregue</button>`
+          + `<button type="button" data-a="rota" data-p="${esc(x.ped)}"${temEnd(x) ? "" : " disabled"}>🗺️ Rota</button></div>`
+          + `<button type="button" class="cb-cancelar" data-a="fechar" data-p="${esc(x.ped)}">✕ Fechar (escolher outra entrega)</button>`)
+      + `</div>`;
   };
   function mostrar() {
     const el = $("#en_lista");
     el.innerHTML = lista.length ? lista.map(cartao).join("") : `<div class="cb-vazio">✅ Nenhuma entrega pendente.</div>`;
     const achar = p => lista.find(x => x.ped === p);
-    const rota = x => abrirRota({ nome: x.nome, end: x.end, reg: x.reg, cep: x.cep });
+    const rota = x => abrirRota({ nome: x.nome, end: x.end, reg: x.reg, cep: x.cep }, true);
     el.querySelectorAll("button.cb-rota[data-rota]").forEach(b => b.onclick = () => rota(achar(b.dataset.rota)));
+    el.querySelectorAll("[data-sel]").forEach(d => d.onclick = () => { selecionada = selecionada === d.dataset.sel ? "" : d.dataset.sel; mostrar(); });
     el.querySelectorAll("[data-a]").forEach(b => b.onclick = () => {
       const x = achar(b.dataset.p), a = b.dataset.a;
-      if (a === "zap") mandarAoEntregador(x); else if (a === "rota") rota(x); else status(x, a);
+      if (a === "fechar") { selecionada = ""; mostrar(); }
+      else if (a === "trocar") trocarEntregador(x);
+      else if (a === "zap") mandarAoEntregador(x); else if (a === "rota") rota(x); else status(x, a);
     });
   }
   // + Entregador (E3): nome + WhatsApp — mesma regra e cores do campo WhatsApp dos formulários; vai ao bot com prévia e "sim"
@@ -515,7 +553,16 @@ function montarEntregas() {
     } else if (!e) { campo.classList.remove("sem-ddd", "cel-ruim"); caixa.classList.remove("campo-ruim"); }
     else if (digitosNumero(inp.value).length > 11) { caixa.classList.add("campo-ruim"); campo.classList.add("cel-ruim"); }
   }
-  function abrirCadastro() { $("#en_form").classList.remove("oculto"); $("#g_nome").focus(); }
+  function abrirCadastro() {
+    $("#en_form").classList.remove("oculto"); $("#en_add").classList.add("oculto");
+    $("#en_form").scrollIntoView({ behavior: "smooth", block: "start" }); $("#g_nome").focus();
+  }
+  // 14/11: ✕ Cancelar fecha o quadro e limpa os campos (e as cores)
+  function cancelarCadastro() {
+    $("#g_nome").value = ""; $("#g_cel").value = ""; $("#g_nome").classList.remove("erro-campo");
+    $("#g_cel_campo").className = "campo-cel"; $("#g_cel_caixa").className = "ddi"; $("#aviso").textContent = "";
+    $("#en_form").classList.add("oculto"); $("#en_add").classList.remove("oculto");
+  }
   function salvarEntregador() {
     const nome = $("#g_nome").value.trim().replace(/\s+/g, " "), v = $("#g_cel").value, e = erroNumeroCel(v);
     pintarCel(true);
@@ -529,17 +576,21 @@ function montarEntregas() {
   $("#titulo").textContent = "🚚 Entregas";
   document.querySelector(".sub").textContent = "Interno. O entregador recebe só a mensagem no WhatsApp. Saiu, Entregue e ↩️ gravam direto.";
   $("#enviar").remove();
-  form.innerHTML = `<div class="en-cad"><button type="button" class="add" id="en_add">+ Entregador</button>
+  // 14/11 (1º teste): topo só com as entregas; cadastro de entregador no fim da página
+  form.innerHTML = `<div id="en_lista"></div>
+    <div class="en-cad"><legend>Entregadores</legend>
       <div class="en-ents">${ENTREGADORES.length ? "🛵 " + ENTREGADORES.map(g => esc(g[1])).join(" · ") : "Nenhum entregador cadastrado ainda."}</div>
+      <button type="button" class="add" id="en_add">+ Entregador</button>
       <div class="en-form oculto" id="en_form">
         <label for="g_nome">Nome do entregador *</label><input id="g_nome" placeholder="Ex.: João Motoboy">
         <div class="campo-cel" id="g_cel_campo">
           <label for="g_cel">Celular / <span class="lb-wpp">WhatsApp</span> (<span class="lb-ddd">com DDD</span>) *</label>
           <div class="ddi" id="g_cel_caixa"><span>+55</span><input id="g_cel" type="tel" inputmode="tel" placeholder="(00) 00000-0000"></div></div>
-        <button type="button" class="en-salvar" id="en_salvar">Enviar cadastro</button>
-        <div class="dica">O bot mostra a prévia e só grava depois do seu "sim".</div></div></div>
-    <div id="en_lista"></div>`;
-  $("#en_add").onclick = () => $("#en_form").classList.contains("oculto") ? abrirCadastro() : $("#en_form").classList.add("oculto");
+        <div class="en-form-bts"><button type="button" class="cb-cancelar" id="en_cancelar">✕ Cancelar</button>
+          <button type="button" class="en-salvar" id="en_salvar">Realizar cadastro</button></div>
+        <div class="dica">O bot mostra a prévia e só grava depois do seu "sim".</div></div></div>`;
+  $("#en_add").onclick = abrirCadastro;
+  $("#en_cancelar").onclick = cancelarCadastro;
   $("#g_cel").addEventListener("blur", () => pintarCel(true));
   $("#g_cel").addEventListener("input", () => pintarCel(false));
   $("#g_nome").addEventListener("input", () => $("#g_nome").classList.remove("erro-campo"));
