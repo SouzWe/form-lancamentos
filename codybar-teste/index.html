@@ -157,6 +157,14 @@
   .dica.deve b { color: var(--erro); }   /* 07/11: frase simples (caixa recusada), só o valor em vermelho */
   .dica.quitada { border: 1px solid var(--ok); color: var(--ok); font-weight: 600; }
   .dica.excesso { color: var(--erro); }
+  /* 13/11 (E2 🚚): Entrega — Eu entrego (padrão, sem frete) | 🚚 Entregador (frete da região). Sem frete = borda vermelha */
+  .entrega { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; background: var(--campo); padding: 4px;
+             border-radius: 12px; border: 1px solid transparent; }
+  .entrega label { display: flex; align-items: center; justify-content: center; gap: 8px; margin: 0; padding: 10px;
+                   border-radius: 9px; cursor: pointer; font-size: 15px; color: var(--txt); }
+  .entrega input { width: auto; height: auto; margin: 0; padding: 0; accent-color: var(--btn); }
+  .entrega label:has(input:checked) { background: var(--btn); color: var(--btn-txt); }
+  .entrega.erro-frete, .entrega.erro-campo { border-color: var(--erro); }
   /* 08/11 (Wellington): celular na Venda nova — verde = cadastrado, vermelho = atenção */
   #bloco-cel.cel-ok input { border: 1px solid var(--ok); }
   #bloco-cel.cel-ok .dica { color: var(--ok); }
@@ -182,7 +190,7 @@ const form = $("#form");
 // Listas vêm no link do botão (depois do #, não chega a servidor nenhum): z = JSON compactado (deflate puro,
 // base64 url-safe) com p = produtos [id, nome, unidade, preço], c = clientes [id, nome, bairro], r = bairros [nome].
 // Sem listas, os campos ficam livres.
-let PRODUTOS = [], CLIENTES = [], BAIRROS = [];
+let PRODUTOS = [], CLIENTES = [], BAIRROS = [], FRETES = {};   // 13/11 (E1 🚚): f = {região: frete}
 async function carregarListas() {
   try {
     const b = (new URLSearchParams(location.hash.slice(1)).get("z") || "").replace(/-/g, "+").replace(/_/g, "/");
@@ -190,7 +198,7 @@ async function carregarListas() {
     const bytes = Uint8Array.from(atob(b + "=".repeat((4 - b.length % 4) % 4)), c => c.charCodeAt(0));
     const fluxo = new Blob([bytes]).stream().pipeThrough(new DecompressionStream("deflate-raw"));
     const d = JSON.parse(await new Response(fluxo).text());
-    PRODUTOS = d.p || []; CLIENTES = d.c || []; BAIRROS = d.r || [];
+    PRODUTOS = d.p || []; CLIENTES = d.c || []; BAIRROS = d.r || []; FRETES = d.f || {};
   } catch (e) { /* sem listas: campos livres */ }
 }
 
@@ -480,8 +488,10 @@ function escolherCliente(c) {
     $("#caixa-cliente").innerHTML = `<input id="busca" placeholder="Cliente… (toque ou digite)"><div class="achados" id="achados"></div>`;
     ajustarModalTalao();   // 12/11 (I031): sem cliente = modal completo
     ligarBusca(); $("#busca").focus();
+    somar();               // 13/11 (E2 🚚): sem cliente = sem região de frete
   };
   ajustarModalTalao();     // 12/11 (I031): cliente com talão = modal encolhe
+  somar();                 // 13/11 (E2 🚚): frete da região do cliente
 }
 const nomeCliente = () => clienteEscolhido ? `${clienteEscolhido[1]} (${clienteEscolhido[0]})` : val("busca");
 
@@ -607,12 +617,43 @@ const descPct = () => { const n = parseFloat(String(val("desc_pct") || "").repla
 const descOk = () => { const p = descPct(); return !val("desc_pct") || p === 0 || (p >= 0.01 && p <= 99.99); };
 const descValor = () => { const p = descPct(); return descOk() && p > 0 ? Math.round(subtotalVenda() * p + 1e-7) / 100 : 0; };
 const pctTxt = () => String(descPct()).replace(".", ",") + "%";
-const totalVenda = () => Math.round((subtotalVenda() - descValor()) * 100) / 100;   // total COM desconto (pago, restante, frases)
+// 13/11 (E2 🚚): Entrega. Eu entrego = sem frete (venda igual a antes). 🚚 Entregador = frete fixo da região
+// (link do botão, f = {região: frete}), somado DEPOIS do desconto (o desconto vale só nos produtos).
+// Região sem frete (ou cliente sem região, ou bairro novo do "Outros") = borda vermelha + frase, não envia.
+const comEntregador = () => !!document.querySelector("input[name=entrega][value=entregador]:checked");
+function regiaoEntrega() {
+  if (tipo === "venda") return clienteEscolhido ? String(clienteEscolhido[2] || "").trim() : "";
+  if (tipo === "cliente") { const s = val("c_bairro"); return s === OUTRO ? val("c_bairro_novo") : s; }
+  return "";
+}
+function freteDaRegiao(reg) {
+  if (!reg) return 0;
+  const k = Object.keys(FRETES).find(x => sem(x).trim() === sem(reg).trim());
+  return k ? Number(FRETES[k]) || 0 : 0;
+}
+const freteValor = () => comEntregador() ? freteDaRegiao(regiaoEntrega()) : 0;
+const FRETE_ERRO = "Região sem frete definido: escolha Eu entrego ou defina o frete da região.";
+const freteErro = () => comEntregador() && !(freteValor() > 0) ? FRETE_ERRO : "";
+const freteRot = () => `Frete (${regiaoEntrega()}): ${reais(freteValor())}`;
+function mostrarFrete() {
+  const d = $("#frete_dica");
+  if (!d) return;
+  const e = freteErro(), fv = freteValor();
+  $("#entrega_box").classList.toggle("erro-frete", !!e);
+  d.className = "dica" + (e ? " excesso" : "") + (e || fv ? "" : " oculto");
+  d.textContent = e || (fv ? freteRot() : "");
+}
+const totalVenda = () => Math.round((subtotalVenda() - descValor() + freteValor()) * 100) / 100;   // total COM desconto e frete (pago, restante, frases)
 function somar() {
-  const s = subtotalVenda(), dv = descValor(), t = totalVenda();
+  const s = subtotalVenda(), dv = descValor(), fv = freteValor(), t = totalVenda();
   const rot = tipo === "divida" ? "Total do talão: " : "Total: ";
-  $("#total").innerHTML = s <= 0 ? "" : !dv ? esc(rot + reais(t))   // 07/11: caixa testada e recusada, voltou o texto simples
-    : `<div class="sub">Subtotal: ${reais(s)}</div><div class="sub">Desconto: ${esc(pctTxt())} (− ${reais(dv)})</div><div>${esc(rot + reais(t))}</div>`;
+  // ordem: Subtotal → Desconto → Frete (região) → Total
+  $("#total").innerHTML = s <= 0 ? "" : !dv && !fv ? esc(rot + reais(t))   // 07/11: caixa testada e recusada, voltou o texto simples
+    : `<div class="sub">Subtotal: ${reais(s)}</div>`
+      + (dv ? `<div class="sub">Desconto: ${esc(pctTxt())} (− ${reais(dv)})</div>` : "")
+      + (fv ? `<div class="sub">${esc(freteRot())}</div>` : "")
+      + `<div>${esc(rot + reais(t))}</div>`;
+  mostrarFrete();
   pagamento();
 }
 
@@ -652,6 +693,11 @@ const PAGAMENTO_HTML = `<fieldset><legend>Pagamento</legend>
       <div class="dupla"><div>${CAMPO("pg_valor", "Pago agora R$", "text", 'inputmode="decimal" placeholder="0,00"')}</div>
         <div><label for="pg_forma">Forma</label><select id="pg_forma"><option value="">—</option><option>dinheiro</option><option>pix</option><option>cartão</option></select></div></div>
       <div class="dica" id="pg_dica">Não pagou agora? Deixe em branco e marque a data da cobrança.</div></fieldset>`;
+// 13/11 (E2 🚚): Entrega, logo antes do Pagamento (Venda nova e Primeira compra). Padrão = Eu entrego.
+const ENTREGA_HTML = `<fieldset id="fs-entrega"><legend>Entrega</legend>
+      <div class="entrega" id="entrega_box"><label><input type="radio" name="entrega" value="vendedor" checked> Eu entrego</label>
+        <label><input type="radio" name="entrega" value="entregador"> 🚚 Entregador</label></div>
+      <div class="dica oculto" id="frete_dica"></div></fieldset>`;
 const COBRANCA_HTML = `<fieldset id="fs-cobranca"><legend>Cobrança</legend>
       ${CAMPO("cobranca", "Data de cobrança *", "date")}${HORA_COBRANCA}</fieldset>`;
 // Celular do cliente já cadastrado (08/11): Venda nova e Débitos › Já cadastrado
@@ -676,6 +722,7 @@ if (tipo === "venda") {
       ${BLOCO_CEL}
       ${CAMPO("data", "Data da venda", "date", `value="${hojeISO()}"`)}</fieldset>
     ${PRODUTOS_HTML("Produtos")}
+    ${ENTREGA_HTML}
     ${PAGAMENTO_HTML}
     ${COBRANCA_HTML}
     <fieldset>${OBS}</fieldset>`;
@@ -686,7 +733,7 @@ if (tipo === "venda") {
     ${PRODUTOS_HTML("Primeira compra (se tiver)")}
     <div id="bloco-compra" class="oculto">
       <fieldset><legend>Venda</legend>${CAMPO("data", "Data da venda", "date", `value="${hojeISO()}"`)}</fieldset>
-      ${PAGAMENTO_HTML}${COBRANCA_HTML}</div>`;
+      ${ENTREGA_HTML}${PAGAMENTO_HTML}${COBRANCA_HTML}</div>`;
 } else {
   $("#titulo").textContent = "📒 Débito anterior (talão)";
   form.innerHTML = `
@@ -755,6 +802,10 @@ if (tipo === "venda") form.insertAdjacentHTML("beforeend", `<fieldset><legend>�
 linhaProduto();   // linha vazia é ignorada no envio (primeira compra do cliente novo é opcional)
 ligarBusca(); ligarCadastro(); ligarCel("c_cel"); ligarCel("v_cel"); ligarCep();
 ajustarModalTalao();   // 12/11: Débitos abre no Já cadastrado (sem Desconto %)
+// 13/11 (E2 🚚): trocar a Entrega ou o bairro (Cliente novo) refaz o frete e o total
+document.querySelectorAll("input[name=entrega]").forEach(r => r.addEventListener("change", somar));
+if ($("#c_bairro")) $("#c_bairro").addEventListener("change", somar);
+if ($("#c_bairro_novo")) $("#c_bairro_novo").addEventListener("input", somar);
 
 // 12/11 (Wellington): data/horário/escolha sem valor ficam cinza (classe "vazio"); com valor, cor normal
 function marcarVazios() {
@@ -766,7 +817,11 @@ marcarVazios();
 
 // ---------- texto enviado ao bot ----------
 // 12/11 (I032): só com desconto; sem desconto o texto fica igual a antes
-const linhasDesconto = () => descValor() ? [`Subtotal: ${reais(subtotalVenda())}`, `Desconto: ${pctTxt()} (− ${reais(descValor())})`] : [];
+// 13/11 (E2 🚚): com 🚚 Entregador entra "Frete (Região): R$ X" depois do Desconto (Subtotal → Desconto → Frete → Total)
+const linhasDesconto = () => [
+  ...(descValor() || freteValor() ? [`Subtotal: ${reais(subtotalVenda())}`] : []),
+  ...(descValor() ? [`Desconto: ${pctTxt()} (− ${reais(descValor())})`] : []),
+  ...(freteValor() ? [freteRot()] : [])];
 function montarTexto() {
   // Total + pago na hora + cobrança: iguais na Venda nova e na 1ª compra do Cliente novo (08/11)
   const fechamento = () => {
@@ -775,7 +830,8 @@ function montarTexto() {
     const pago = pg > 0 ? [`Pago na hora: ${reais(pg)} (${val("pg_forma")})`] : ["Pago na hora: não"];
     const cob = quitou ? ["Cobrança: não tem (venda quitada)"]
       : [`${pg > 0 ? `Restante ${reais(t - pg)} · data` : "Data"} de cobrança: ${br(val("cobranca"))}`, ...linhaHoraCobranca()];
-    return [...linhasDesconto(), `Total: ${reais(t)}`, "", ...pago, ...cob];
+    // 13/11 (E2 🚚): Eu entrego = nenhuma linha nova; 🚚 Entregador = "Entrega: 🚚 Entregador" + linha do Frete
+    return [...(comEntregador() ? ["Entrega: 🚚 Entregador"] : []), ...linhasDesconto(), `Total: ${reais(t)}`, "", ...pago, ...cob];
   };
   if (tipo === "venda") {
     return ["🛒 FORMULÁRIO VENDA NOVA", "", `Cliente: ${nomeCliente()}`, ...(clienteEscolhido ? [linhaCel()] : []), `Data da venda: ${br(val("data"))}`,
@@ -888,7 +944,7 @@ function regiaoDoCep(bairro) {
   const perto = BAIRROS.filter(r => { const m = sem(r).trim(); return m && (m.includes(n) || n.includes(m)); });
   return perto.length === 1 ? perto[0] : "";   // nunca cria região: sem certeza, o vendedor escolhe
 }
-function mostrarDica(id, html) { const el = $("#" + id); if (!el) return; el.innerHTML = html; el.classList.toggle("oculto", !html); }
+function mostrarDica(id, html) { const el = $("#" + id); if (!el) return; el.innerHTML = html; el.classList.toggle("oculto", !html); if ($("#frete_dica")) somar(); }
 function buscarCep() {
   const d = val("c_cep").replace(/\D/g, "");
   if (d.length !== 8) { cepConsultado = ""; mostrarDica("c_cep_dica", ""); mostrarDica("c_end_dica", ""); return; }
@@ -967,6 +1023,7 @@ function mostrarSituacao(c) {
 
 function conferirPagamento() {
   if (!descOk()) return "Desconto precisa ser de 0,01% a 99,99% (ou deixe em branco).";
+  if (freteErro()) return FRETE_ERRO;   // 13/11 (E2 🚚): 🚚 só com frete definido na região
   const t = totalVenda(), pg = num(val("pg_valor"));
   if (val("pg_valor") && pg <= 0) return "Valor pago inválido.";
   if (pg > t + 0.005) return tipo === "divida" ? "Recebido maior que o total do talão." : "Pago maior que o total da venda.";
@@ -1034,6 +1091,7 @@ function camposDoErro(e) {
   else if (e.startsWith("Falta a data do recebimento")) m = um("rec_data");
   else if (/falta a data da cobrança|Falta a data da cobrança/.test(e)) m = um("cobranca");
   else if (e.startsWith("Desconto precisa")) m = um("desc_pct");
+  else if (e === FRETE_ERRO) m = um("entrega_box");   // 13/11 (E2 🚚)
   m = m.filter(Boolean);
   return { marcar: m, ir: m[0] || null };
 }
