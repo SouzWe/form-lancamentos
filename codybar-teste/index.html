@@ -165,6 +165,29 @@
   .entrega input { width: auto; height: auto; margin: 0; padding: 0; accent-color: var(--btn); }
   .entrega label:has(input:checked) { background: var(--btn); color: var(--btn-txt); }
   .entrega.erro-frete, .entrega.erro-campo { border-color: var(--erro); }
+  /* 14/11 (E3 + E4 🚚): Entregas (interno) — cartão por entrega + ações */
+  .en-cad { margin-bottom: 6px; }
+  .en-cad .add { margin-bottom: 4px; }
+  .en-form { margin-top: 8px; padding: 12px; border-radius: 12px; background: var(--campo); }
+  .en-form input { background: var(--bg); }
+  .en-form .ddi span { background: var(--bg); }
+  .en-salvar { width: 100%; margin-top: 12px; padding: 12px; border: 0; border-radius: 10px; background: var(--btn);
+               color: var(--btn-txt); font: 600 15px/1 inherit; cursor: pointer; }
+  .en-ents { color: var(--dica); font-size: 13px; margin: 2px 0 6px; }
+  .en-item { position: relative; padding: 16px 0 14px; border-bottom: 1px solid rgba(127, 127, 127, .5);
+             border-bottom-color: color-mix(in srgb, var(--txt) 50%, transparent); }
+  .en-ped { color: var(--dica); font-size: 12px; margin-top: 2px; }
+  .en-st { font-size: 14px; margin-top: 3px; font-weight: 600; }
+  .en-st.saiu { color: var(--fixo); }
+  .en-pago { color: var(--ok); }
+  .en-acoes { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; margin-top: 10px; }
+  .en-acoes button { padding: 10px 4px; border: 1px solid transparent; border-radius: 10px; background: var(--campo);
+                     color: var(--txt); font: inherit; font-size: 13px; cursor: pointer; }
+  .en-acoes button.zap { grid-column: 1 / -1; border-color: var(--ok); color: var(--ok); background: none; font-weight: 600; }
+  .en-lista-ent { display: grid; gap: 8px; }
+  .en-lista-ent button { padding: 12px; border: 0; border-radius: 12px; background: var(--campo); color: var(--txt);
+                         font: inherit; text-align: left; cursor: pointer; }
+  .en-lista-ent button.ultimo { background: var(--btn); color: var(--btn-txt); font-weight: 600; }
   /* 08/11 (Wellington): celular na Venda nova — verde = cadastrado, vermelho = atenção */
   #bloco-cel.cel-ok input { border: 1px solid var(--ok); }
   #bloco-cel.cel-ok .dica { color: var(--ok); }
@@ -182,7 +205,7 @@
 
 <script>
 const tg = window.Telegram && Telegram.WebApp;
-const TIPOS = ["venda", "cliente", "divida", "cobrancas"];   // 13/11: 🗺️ Cobranças (só consulta)
+const TIPOS = ["venda", "cliente", "divida", "cobrancas", "entregas"];   // 13/11: 🗺️ Cobranças (só consulta); 14/11: 🚚 Entregas
 const tipo = TIPOS.includes(new URLSearchParams(location.search).get("tipo")) ? new URLSearchParams(location.search).get("tipo") : "venda";
 const $ = s => document.querySelector(s);
 const form = $("#form");
@@ -191,6 +214,7 @@ const form = $("#form");
 // base64 url-safe) com p = produtos [id, nome, unidade, preço], c = clientes [id, nome, bairro], r = bairros [nome].
 // Sem listas, os campos ficam livres.
 let PRODUTOS = [], CLIENTES = [], BAIRROS = [], FRETES = {};   // 13/11 (E1 🚚): f = {região: frete}
+let ENTREGAS_LISTA = [], ENTREGADORES = [];   // 14/11 (E3 + E4 🚚): e = entregas abertas, g = entregadores ativos
 async function carregarListas() {
   try {
     const b = (new URLSearchParams(location.hash.slice(1)).get("z") || "").replace(/-/g, "+").replace(/_/g, "/");
@@ -199,6 +223,7 @@ async function carregarListas() {
     const fluxo = new Blob([bytes]).stream().pipeThrough(new DecompressionStream("deflate-raw"));
     const d = JSON.parse(await new Response(fluxo).text());
     PRODUTOS = d.p || []; CLIENTES = d.c || []; BAIRROS = d.r || []; FRETES = d.f || {};
+    ENTREGAS_LISTA = d.e || []; ENTREGADORES = d.g || [];
   } catch (e) { /* sem listas: campos livres */ }
 }
 
@@ -215,6 +240,62 @@ function erroNumeroCel(v) {
   if (d.length === 11 && d[2] !== "9") return "Celular com 11 números precisa ter o 9 depois do DDD, ex.: (00) 90000-0000.";
   if (d.length !== 10 && d.length !== 11) return "Número com quantidade errada: DDD + número (celular 11 dígitos, fixo 10).";
   return "";
+}
+
+// ---------- rota + cópia + link (13/11; globais desde 14/11: 🗺️ Cobranças e 🚚 Entregas usam os mesmos) ----------
+const escHtml = t => String(t).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+// abrirRota(x): x = { nome, end, reg ("" = sem região), cep (só números) }
+function abrirLink(url) {
+  if (tg && tg.openLink && tg.platform && tg.platform !== "unknown") tg.openLink(url); else window.open(url, "_blank");
+}
+// 🗺️ Rota (13/11): escolha do app — Waze, Google Maps (de onde o vendedor está: sem origem = GPS),
+// copiar o endereço ou mandar no WhatsApp (sem número: o vendedor escolhe o contato). Nada é enviado sozinho.
+const CHAVE_APP = "cb_rota_app";
+const lerApp = () => { try { return localStorage.getItem(CHAVE_APP) || ""; } catch (e) { return ""; } };
+const guardarApp = a => { try { localStorage.setItem(CHAVE_APP, a); } catch (e) {} };
+function avisoCurto(txt) {
+  const el = document.createElement("div");
+  el.className = "cb-toast"; el.textContent = txt;
+  document.body.appendChild(el);
+  setTimeout(() => el.remove(), 1800);
+}
+function copiarTexto(txt) {
+  const reserva = () => {
+    const a = document.createElement("textarea");
+    a.value = txt; a.setAttribute("readonly", ""); a.style.position = "fixed"; a.style.opacity = "0";
+    document.body.appendChild(a); a.select();
+    let ok = false; try { ok = document.execCommand("copy"); } catch (e) {}
+    a.remove(); return ok;
+  };
+  const fim = ok => avisoCurto(ok ? "Endereço copiado" : "Não deu para copiar");
+  if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(txt).then(() => fim(true), () => fim(reserva()));
+  else fim(reserva());
+}
+function abrirRota(x) {
+  if (!x || (!x.end && !x.cep)) return;
+  const cep = x.cep.length === 8 ? x.cep.slice(0, 5) + "-" + x.cep.slice(5) : x.cep;
+  const destino = [x.end, x.reg, cep].filter(Boolean).join(", ");   // o mesmo de antes
+  const d = encodeURIComponent(destino);
+  const maps = `https://www.google.com/maps/dir/?api=1&destination=${d}`;
+  const acoes = {
+    waze: () => abrirLink(`https://waze.com/ul?q=${d}&navigate=yes`),
+    maps: () => abrirLink(maps),
+    copiar: () => copiarTexto(destino),
+    // 13/11: copia o endereço DENTRO do toque (antes de abrir o WhatsApp); se a cópia falhar, abre igual
+    whats: () => { try { copiarTexto(destino); } catch (e) {} abrirLink(`https://wa.me/?text=${encodeURIComponent(`📍 ${x.nome}\n${destino}\n${maps}`)}`); },
+  };
+  const ult = lerApp();
+  const bt = (k, txt) => `<button type="button" data-app="${k}"${k === ult ? ' class="ultimo"' : ""}>${txt}</button>`;
+  const fundo = document.createElement("div");
+  fundo.className = "cb-fundo";
+  fundo.innerHTML = `<div class="cb-folha" role="dialog" aria-label="Rota até ${escHtml(x.nome)}">
+    <div class="cb-folha-topo"><b>🗺️ Rota até ${escHtml(x.nome)}</b><button type="button" class="cb-folha-x" aria-label="Fechar">✕</button></div>
+    <div class="cb-apps">${bt("waze", "🚗 Waze")}${bt("maps", "📍 Google Maps")}${bt("copiar", "📋 Copiar endereço")}${bt("whats", "💬 Mandar no WhatsApp")}</div></div>`;
+  const fechar = () => fundo.remove();
+  fundo.onclick = e => { if (e.target === fundo) fechar(); };
+  fundo.querySelector(".cb-folha-x").onclick = fechar;
+  fundo.querySelectorAll("[data-app]").forEach(b => b.onclick = () => { guardarApp(b.dataset.app); fechar(); acoes[b.dataset.app](); });
+  document.body.appendChild(fundo);
 }
 
 // ---------- 🗺️ Cobranças por região (13/11, C045 + C116/I033) ----------
@@ -292,63 +373,14 @@ function montarCobrancas() {
       : `Olá, ${nome}! Passando para lembrar da cobrança de ${reais(x.total)}, combinada para ${ddmm(x.cob.d)}.${fim}`;
     abrirLink(`https://wa.me/55${d}?text=${encodeURIComponent(msg)}`);
   }
-  function abrirLink(url) {
-    if (tg && tg.openLink && tg.platform && tg.platform !== "unknown") tg.openLink(url); else window.open(url, "_blank");
-  }
-  // 🗺️ Rota (13/11): escolha do app — Waze, Google Maps (de onde o vendedor está: sem origem = GPS),
-  // copiar o endereço ou mandar no WhatsApp (sem número: o vendedor escolhe o contato). Nada é enviado sozinho.
-  const CHAVE_APP = "cb_rota_app";
-  const lerApp = () => { try { return localStorage.getItem(CHAVE_APP) || ""; } catch (e) { return ""; } };
-  const guardarApp = a => { try { localStorage.setItem(CHAVE_APP, a); } catch (e) {} };
-  function avisoCurto(txt) {
-    const el = document.createElement("div");
-    el.className = "cb-toast"; el.textContent = txt;
-    document.body.appendChild(el);
-    setTimeout(() => el.remove(), 1800);
-  }
-  function copiarTexto(txt) {
-    const reserva = () => {
-      const a = document.createElement("textarea");
-      a.value = txt; a.setAttribute("readonly", ""); a.style.position = "fixed"; a.style.opacity = "0";
-      document.body.appendChild(a); a.select();
-      let ok = false; try { ok = document.execCommand("copy"); } catch (e) {}
-      a.remove(); return ok;
-    };
-    const fim = ok => avisoCurto(ok ? "Endereço copiado" : "Não deu para copiar");
-    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(txt).then(() => fim(true), () => fim(reserva()));
-    else fim(reserva());
-  }
-  function abrirRota(x) {
-    if (!x || (!x.end && !x.cep)) return;
-    const cep = x.cep.length === 8 ? x.cep.slice(0, 5) + "-" + x.cep.slice(5) : x.cep;
-    const destino = [x.end, x.reg !== SEM_REG ? x.reg : "", cep].filter(Boolean).join(", ");   // o mesmo de antes
-    const d = encodeURIComponent(destino);
-    const maps = `https://www.google.com/maps/dir/?api=1&destination=${d}`;
-    const acoes = {
-      waze: () => abrirLink(`https://waze.com/ul?q=${d}&navigate=yes`),
-      maps: () => abrirLink(maps),
-      copiar: () => copiarTexto(destino),
-      // 13/11: copia o endereço DENTRO do toque (antes de abrir o WhatsApp); se a cópia falhar, abre igual
-      whats: () => { try { copiarTexto(destino); } catch (e) {} abrirLink(`https://wa.me/?text=${encodeURIComponent(`📍 ${x.nome}\n${destino}\n${maps}`)}`); },
-    };
-    const ult = lerApp();
-    const bt = (k, txt) => `<button type="button" data-app="${k}"${k === ult ? ' class="ultimo"' : ""}>${txt}</button>`;
-    const fundo = document.createElement("div");
-    fundo.className = "cb-fundo";
-    fundo.innerHTML = `<div class="cb-folha" role="dialog" aria-label="Rota até ${esc(x.nome)}">
-      <div class="cb-folha-topo"><b>🗺️ Rota até ${esc(x.nome)}</b><button type="button" class="cb-folha-x" aria-label="Fechar">✕</button></div>
-      <div class="cb-apps">${bt("waze", "🚗 Waze")}${bt("maps", "📍 Google Maps")}${bt("copiar", "📋 Copiar endereço")}${bt("whats", "💬 Mandar no WhatsApp")}</div></div>`;
-    const fechar = () => fundo.remove();
-    fundo.onclick = e => { if (e.target === fundo) fechar(); };
-    fundo.querySelector(".cb-folha-x").onclick = fechar;
-    fundo.querySelectorAll("[data-app]").forEach(b => b.onclick = () => { guardarApp(b.dataset.app); fechar(); acoes[b.dataset.app](); });
-    document.body.appendChild(fundo);
-  }
   function mostrar() {
     const esc_ = $("#cb_regiao").value, el = $("#cb_lista"), q = sem($("#cb_busca").value.trim());
     setTimeout(() => {
       el.querySelectorAll("button.cb-num[data-id]").forEach(b => b.onclick = () => cobrarWhatsApp(devedores.find(x => x.id === b.dataset.id)));
-      el.querySelectorAll("button.cb-rota[data-rota]").forEach(b => b.onclick = () => abrirRota(devedores.find(x => x.id === b.dataset.rota)));
+      el.querySelectorAll("button.cb-rota[data-rota]").forEach(b => b.onclick = () => {
+        const x = devedores.find(x => x.id === b.dataset.rota);
+        abrirRota(x && { ...x, reg: x.reg === SEM_REG ? "" : x.reg });
+      });
     }, 0);
     const vale = x => (!esc_ || x.reg === esc_) && (!q || sem(x.nome).includes(q));   // v2: busca vale junto com a região
     const lista = devedores.filter(vale);
@@ -373,6 +405,149 @@ function montarCobrancas() {
   if (tg) { tg.ready(); tg.expand(); }
 }
 
+// ---------- 🚚 Entregas (14/11, E3 + E4) — interno: vendedor / ponto fixo ----------
+// O motoboy só usa o WhatsApp: recebe 1 mensagem pronta (💬), toca no link e responde "saí"/"entreguei".
+// Dados no link do botão: e = [pedido, cliente, nome, celular, região, endereço, referência, CEP, a cobrar,
+// saiu (0/1), hora da saída, entregador]; g = [id, nome, celular]. Entregue some da lista (o vigia reenvia os botões).
+// 🛵 Saiu / ✅ Entregue / ↩️ mandam uma linha curta ao bot, que grava direto (sem prévia).
+function montarEntregas() {
+  const esc = escHtml;
+  const reais = n => "R$ " + Number(n).toFixed(2).replace(".", ",").replace(/\B(?=(\d{3})+,)/g, ".");
+  const fmtCel = v => { const d = digitosNumero(v);
+    return d.length === 11 ? `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}` : d.length === 10 ? `(${d.slice(0, 2)}) ${d.slice(2, 6)}-${d.slice(6)}` : d; };
+  const cepFmt = c => c.length === 8 ? c.slice(0, 5) + "-" + c.slice(5) : c;
+  const nomeEnt = id => (ENTREGADORES.find(g => g[0] === id) || [])[1] || id;
+  // quem o vendedor escolheu no 💬 (por pedido, só neste aparelho) vale para o 🛵 Saiu
+  const CHAVE = "cb_ent_";
+  const lerEsc = p => { try { return localStorage.getItem(CHAVE + p) || ""; } catch (e) { return ""; } };
+  const guardarEsc = (p, id) => { try { localStorage.setItem(CHAVE + p, id); localStorage.setItem(CHAVE + "ultimo", id); } catch (e) {} };
+  const lista = ENTREGAS_LISTA.map(e => ({ ped: e[0], cli: e[1], nome: e[2], cel: e[3], reg: e[4] || "", end: e[5] || "",
+    ref: e[6] || "", cep: String(e[7] || ""), cobrar: Number(e[8]) || 0, saiu: e[9] === 1, saida: e[10] || "", ent: e[11] || "" }));
+  const entDe = x => x.ent || (ENTREGADORES.some(g => g[0] === lerEsc(x.ped)) ? lerEsc(x.ped) : "");
+  const destino = x => [x.end, x.reg, cepFmt(x.cep)].filter(Boolean).join(", ");
+  const temEnd = x => !!(x.end || x.cep);
+  function mensagem(x) {
+    return [`🚚 Entrega · ${x.nome}`,
+      `📍 ${[x.end, x.reg, x.cep ? "CEP " + cepFmt(x.cep) : ""].filter(Boolean).join(", ") || "endereço não cadastrado"}`,
+      ...(x.ref ? [`📌 Ref.: ${x.ref}`] : []),
+      ...(digitosNumero(x.cel) ? [`📞 Cliente: ${fmtCel(x.cel)}`] : []),
+      x.cobrar > 0 ? `💰 Cobrar: ${reais(x.cobrar)}` : "💰 Já pago (não cobrar)",
+      ...(temEnd(x) ? [`🗺️ Rota: https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(destino(x))}`] : []),
+      `Responda "saí" ao sair e "entreguei" ao entregar 👍`].join("\n");
+  }
+  function aviso(txt) {
+    const a = $("#aviso"); a.textContent = txt;
+    if (txt) { a.style.top = ((window.visualViewport ? visualViewport.offsetTop : 0) + 8) + "px"; setTimeout(() => { a.textContent = ""; }, 6000); }
+  }
+  function enviarBot(texto) {
+    if (tg && tg.platform && tg.platform !== "unknown") { tg.sendData(texto); return; }   // fecha a janela e manda ao bot
+    $("#saida").hidden = false; $("#saida").textContent = texto;                           // fora do Telegram: só mostra
+  }
+  // folha de baixo com os entregadores (mesmo visual da escolha do app da rota)
+  function escolherEntregador(titulo, depois) {
+    if (!ENTREGADORES.length) { aviso("Nenhum entregador cadastrado: use + Entregador."); abrirCadastro(); return; }
+    let ult = ""; try { ult = localStorage.getItem(CHAVE + "ultimo") || ""; } catch (e) {}
+    const fundo = document.createElement("div");
+    fundo.className = "cb-fundo";
+    fundo.innerHTML = `<div class="cb-folha" role="dialog" aria-label="${esc(titulo)}">
+      <div class="cb-folha-topo"><b>${esc(titulo)}</b><button type="button" class="cb-folha-x" aria-label="Fechar">✕</button></div>
+      <div class="en-lista-ent">${ENTREGADORES.map(g => `<button type="button" data-ent="${esc(g[0])}"${g[0] === ult ? ' class="ultimo"' : ""}>🛵 ${esc(g[1])} <small>${esc(fmtCel(g[2]))}</small></button>`).join("")}</div></div>`;
+    const fechar = () => fundo.remove();
+    fundo.onclick = e => { if (e.target === fundo) fechar(); };
+    fundo.querySelector(".cb-folha-x").onclick = fechar;
+    fundo.querySelectorAll("[data-ent]").forEach(b => b.onclick = () => { fechar(); depois(ENTREGADORES.find(g => g[0] === b.dataset.ent)); });
+    document.body.appendChild(fundo);
+  }
+  // 💬 Enviar ao entregador: abre o WhatsApp NO NÚMERO DELE com a mensagem pronta e copia o endereço (não envia sozinho)
+  function mandarAoEntregador(x) {
+    escolherEntregador(`💬 Enviar a entrega de ${x.nome} para…`, g => {
+      guardarEsc(x.ped, g[0]);
+      if (temEnd(x)) { try { copiarTexto(destino(x)); } catch (e) {} }
+      abrirLink(`https://wa.me/55${digitosNumero(g[2])}?text=${encodeURIComponent(mensagem(x))}`);
+      mostrar();
+    });
+  }
+  function status(x, st) {
+    const ent = entDe(x);
+    if (st === "saiu" && !ent) {
+      escolherEntregador(`🛵 Quem saiu com a entrega de ${x.nome}?`, g => { guardarEsc(x.ped, g[0]); enviarBot(`🚚 ENTREGA ${x.ped}: saiu · ${g[0]}`); });
+      return;
+    }
+    enviarBot(st === "pendente" ? `🚚 ENTREGA ${x.ped}: pendente` : `🚚 ENTREGA ${x.ped}: ${st}${ent ? " · " + ent : ""}`);
+  }
+  const cartao = x => {
+    const cod = String(x.cli).replace(/\D/g, "").slice(-4), ent = entDe(x);
+    const rota = temEnd(x) ? `<button type="button" class="cb-rota" data-rota="${esc(x.ped)}" aria-label="Rota até o cliente">🗺️</button>`
+      : `<span class="cb-rota off" aria-label="Sem endereço">🗺️</span>`;
+    return `<div class="en-item">${rota}<div class="cb-nome">${esc(x.nome)} ${esc(cod)}</div>`
+      + `<div class="en-ped">${esc(x.ped)}</div>`
+      + `<div class="cb-li">📍 ${esc([x.reg || "sem região", x.end].filter(Boolean).join(" · "))}</div>`
+      + (x.cobrar > 0 ? `<div class="cb-li">💰 Cobrar: <b>${reais(x.cobrar)}</b></div>` : `<div class="cb-li en-pago">✅ Já pago</div>`)
+      + (x.saiu ? `<div class="en-st saiu">🛵 saiu ${esc(x.saida)}</div>` : `<div class="en-st">🕓 pendente</div>`)
+      + (ent ? `<div class="cb-li">🚚 ${esc(nomeEnt(ent))}</div>` : "")
+      + `<div class="en-acoes"><button type="button" class="zap" data-a="zap" data-p="${esc(x.ped)}">💬 Enviar ao entregador</button>`
+      + (x.saiu ? `<button type="button" data-a="pendente" data-p="${esc(x.ped)}">↩️ Pendente</button>`
+                : `<button type="button" data-a="saiu" data-p="${esc(x.ped)}">🛵 Saiu</button>`)
+      + `<button type="button" data-a="entregue" data-p="${esc(x.ped)}">✅ Entregue</button>`
+      + `<button type="button" data-a="rota" data-p="${esc(x.ped)}"${temEnd(x) ? "" : " disabled"}>🗺️ Rota</button></div></div>`;
+  };
+  function mostrar() {
+    const el = $("#en_lista");
+    el.innerHTML = lista.length ? lista.map(cartao).join("") : `<div class="cb-vazio">✅ Nenhuma entrega pendente.</div>`;
+    const achar = p => lista.find(x => x.ped === p);
+    const rota = x => abrirRota({ nome: x.nome, end: x.end, reg: x.reg, cep: x.cep });
+    el.querySelectorAll("button.cb-rota[data-rota]").forEach(b => b.onclick = () => rota(achar(b.dataset.rota)));
+    el.querySelectorAll("[data-a]").forEach(b => b.onclick = () => {
+      const x = achar(b.dataset.p), a = b.dataset.a;
+      if (a === "zap") mandarAoEntregador(x); else if (a === "rota") rota(x); else status(x, a);
+    });
+  }
+  // + Entregador (E3): nome + WhatsApp — mesma regra e cores do campo WhatsApp dos formulários; vai ao bot com prévia e "sim"
+  function pintarCel(saindo) {
+    const inp = $("#g_cel"), campo = $("#g_cel_campo"), caixa = $("#g_cel_caixa");
+    const e = erroNumeroCel(inp.value), fixo = digitosNumero(inp.value).length === 10, semDDD = e.startsWith("Celular sem DDD");
+    campo.classList.toggle("cel-certo", !!inp.value && !e && !fixo);
+    campo.classList.toggle("cel-fixo", !!inp.value && !e && fixo);
+    if (saindo) {
+      if (!e && inp.value) inp.value = fmtCel(inp.value);
+      campo.classList.toggle("sem-ddd", semDDD);
+      caixa.classList.toggle("campo-ruim", !!e && !semDDD); campo.classList.toggle("cel-ruim", !!e && !semDDD);
+    } else if (!e) { campo.classList.remove("sem-ddd", "cel-ruim"); caixa.classList.remove("campo-ruim"); }
+    else if (digitosNumero(inp.value).length > 11) { caixa.classList.add("campo-ruim"); campo.classList.add("cel-ruim"); }
+  }
+  function abrirCadastro() { $("#en_form").classList.remove("oculto"); $("#g_nome").focus(); }
+  function salvarEntregador() {
+    const nome = $("#g_nome").value.trim().replace(/\s+/g, " "), v = $("#g_cel").value, e = erroNumeroCel(v);
+    pintarCel(true);
+    if (!nome) { aviso("Falta o nome do entregador."); $("#g_nome").classList.add("erro-campo"); $("#g_nome").focus(); return; }
+    if (!digitosNumero(v)) { aviso("Falta o WhatsApp do entregador."); $("#g_cel_caixa").classList.add("campo-ruim"); $("#g_cel").focus(); return; }
+    if (e) { aviso(e); $("#g_cel").focus(); return; }
+    const d = digitosNumero(v);
+    if (ENTREGADORES.some(g => digitosNumero(g[2]) === d)) { aviso("Esse WhatsApp já é de um entregador cadastrado."); return; }
+    enviarBot(["🚚 ENTREGADOR NOVO", "", `Nome: ${nome}`, `WhatsApp: +55 ${fmtCel(d)}${d.length === 10 ? " (fixo — confirmar)" : ""}`].join("\n"));
+  }
+  $("#titulo").textContent = "🚚 Entregas";
+  document.querySelector(".sub").textContent = "Interno. O entregador recebe só a mensagem no WhatsApp. Saiu, Entregue e ↩️ gravam direto.";
+  $("#enviar").remove();
+  form.innerHTML = `<div class="en-cad"><button type="button" class="add" id="en_add">+ Entregador</button>
+      <div class="en-ents">${ENTREGADORES.length ? "🛵 " + ENTREGADORES.map(g => esc(g[1])).join(" · ") : "Nenhum entregador cadastrado ainda."}</div>
+      <div class="en-form oculto" id="en_form">
+        <label for="g_nome">Nome do entregador *</label><input id="g_nome" placeholder="Ex.: João Motoboy">
+        <div class="campo-cel" id="g_cel_campo">
+          <label for="g_cel">Celular / <span class="lb-wpp">WhatsApp</span> (<span class="lb-ddd">com DDD</span>) *</label>
+          <div class="ddi" id="g_cel_caixa"><span>+55</span><input id="g_cel" type="tel" inputmode="tel" placeholder="(00) 00000-0000"></div></div>
+        <button type="button" class="en-salvar" id="en_salvar">Enviar cadastro</button>
+        <div class="dica">O bot mostra a prévia e só grava depois do seu "sim".</div></div></div>
+    <div id="en_lista"></div>`;
+  $("#en_add").onclick = () => $("#en_form").classList.contains("oculto") ? abrirCadastro() : $("#en_form").classList.add("oculto");
+  $("#g_cel").addEventListener("blur", () => pintarCel(true));
+  $("#g_cel").addEventListener("input", () => pintarCel(false));
+  $("#g_nome").addEventListener("input", () => $("#g_nome").classList.remove("erro-campo"));
+  $("#en_salvar").onclick = salvarEntregador;
+  mostrar();
+  if (tg) { tg.ready(); tg.expand(); }
+}
+
 function montar() {
 const OUTRO = "__outro";
 
@@ -384,6 +559,7 @@ const val = id => ($("#" + id)?.value || "").trim();
 const esc = t => String(t).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 const sem = t => (t || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
 if (tipo === "cobrancas") { montarCobrancas(); return; }   // 13/11: página só de consulta
+if (tipo === "entregas") { montarEntregas(); return; }     // 14/11 (E4 🚚): interno
 
 const CAMPO = (id, rotulo, tipoInput = "text", extra = "") =>
   `<label for="${id}">${rotulo}</label><input id="${id}" type="${tipoInput}" ${extra}>`;
