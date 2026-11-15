@@ -196,6 +196,9 @@
   /* 15/11: 🕓 pendente = cor padrão do Telegram (fundo da página) com contorno; 🛵 saiu = cor secundária escura (preenchido) */
   .en-acoes button.en-sel { grid-column: 1 / -1; }
   .en-acoes button:disabled { opacity: .55; cursor: default; }
+  /* 15/11 (BOTOES_ETAPA): botão sozinho na linha ocupa a largura toda */
+  .en-acoes button.en-full { grid-column: 1 / -1; }
+  .en-item.saiu .en-chip { white-space: normal; max-width: 170px; text-align: right; }
   .en-deve { font-size: 14px; margin-top: 12px; }   /* 14/11: bloco "quanto deve" no card da entrega */
   .en-deve .rot:first-child { margin-top: 0; }
   /* 15/11: folha 💰 Pagamento na entrega (abre no ✅ Entregue quando há valor a cobrar) */
@@ -681,7 +684,7 @@ function montarEntregas() {
     const cod = String(x.cli).replace(/\D/g, "").slice(-4), ent = entDe(x), p = esc(x.ped);
     const rota = temEnd(x) ? `<button type="button" class="cb-rota" data-rota="${p}" aria-label="Rota até o cliente">🗺️</button>`
       : `<span class="cb-rota off" aria-label="Sem endereço">🗺️</span>`;
-    const st = x.saiu ? `🛵 saiu ${esc(x.saida)}` : "🕓 pendente";
+    const st = x.saiu ? `🛵 saiu ${esc(x.saida)}${ent ? " · " + esc(nomeEnt(ent)) : ""}` : "🕓 pendente";
     const espera = toqueRecente(x) > 0, off = espera ? " disabled" : "";
     return `<div class="en-item ${x.saiu ? "saiu" : "pend"}"><div class="en-canto"><span class="en-chip">${st}</span>${rota}</div>`
       + `<div class="cb-nome">${esc(x.nome)} ${esc(cod)}</div>`
@@ -691,11 +694,15 @@ function montarEntregas() {
       + blocoDeve(x)
       + (espera ? `<div class="en-aguarda">⏳ enviado, aguardando atualização</div>` : "")
       + `<div class="en-acoes">`
-      + (ent ? `<button type="button" class="zap" data-a="zap" data-p="${p}">🚚 Enviar ao ${esc(nomeEnt(ent))}</button>` : "")
-      + `<button type="button" class="en-sel" data-a="sel" data-p="${p}">👤 Selecionar entregador</button>`
-      + (x.saiu ? `<button type="button" data-a="pendente" data-p="${p}"${off}>↩️ Pendente</button>`
-                : `<button type="button" data-a="saiu" data-p="${p}"${off}>🛵 Saiu</button>`)
-      + `<button type="button" data-a="entregue" data-p="${p}"${off}>✅ Entregue</button></div>`
+      // 15/11 (BOTOES_ETAPA): cada etapa só com os botões dela. 🕓 pendente: Enviar/Selecionar/🛵 Saiu (sem ✅).
+      // 🛵 saiu: só ↩️ Pendente + ✅ Entregue (não se troca entregador depois da saída).
+      + (x.saiu
+        ? `<button type="button" data-a="pendente" data-p="${p}"${off}>↩️ Pendente</button>`
+          + `<button type="button" data-a="entregue" data-p="${p}"${off}>✅ Entregue</button>`
+        : (ent ? `<button type="button" class="zap" data-a="zap" data-p="${p}">🚚 Enviar ao ${esc(nomeEnt(ent))}</button>` : "")
+          + `<button type="button" class="en-sel" data-a="sel" data-p="${p}">👤 Selecionar entregador</button>`
+          + `<button type="button" class="en-full" data-a="saiu" data-p="${p}"${off}>🛵 Saiu</button>`)
+      + `</div>`
       + `<div class="cb-cel">${pilulaCel(x.cel, `data-cli="${p}"`, "Abrir a conversa com o cliente no WhatsApp")}</div>`
       + `</div>`;
   };
