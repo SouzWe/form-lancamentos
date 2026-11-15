@@ -220,6 +220,16 @@
   .en-item.pend { --bg: #ffffff; --txt: #1b1b1b; --dica: #6b6b70; --campo: #ececf0;
                   background: #ffffff; color: #1b1b1b; border: 1px solid #d4d4d9; }
   .en-item.pend .en-acoes button:not(.zap) { background: #ececf0; border-color: #d4d4d9; color: #1b1b1b; }
+  /* 15/11 (EN_CHIP): status em pílula no canto superior direito, empilhado ACIMA do 🗺️ */
+  .en-canto { position: absolute; top: 12px; right: 16px; display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
+  .en-item .en-canto .cb-rota { position: static; }
+  .en-item .cb-nome, .en-item .en-ped { padding-right: 132px; }
+  .en-chip { display: inline-block; padding: 3px 10px; border-radius: 999px; font-size: 12px; font-weight: 600; white-space: nowrap; }
+  .en-item.pend .en-chip { background: #eef0f3; color: #44464d; border: 1px solid #cfd1d7; }
+  .en-item.saiu .en-chip { background: color-mix(in srgb, var(--fixo) 18%, transparent); color: var(--fixo);
+                           border: 1px solid color-mix(in srgb, var(--fixo) 55%, transparent); }
+  /* 15/11: toque enviado há menos de 1 min e o estado ainda é o antigo → aviso + botões desativados */
+  .en-aguarda { font-size: 14px; font-weight: 600; margin-top: 10px; color: var(--dica); }
   .en-item.saiu .en-acoes button:not(.zap) { background: var(--bg); }
   .cb-cancelar { width: 100%; margin-top: 12px; padding: 12px; border: 1px solid var(--dica); border-radius: 12px;
                  background: none; color: var(--txt); font: inherit; font-size: 14px; cursor: pointer; }
@@ -617,12 +627,32 @@ function montarEntregas() {
     document.body.appendChild(fundo);
     atualizar();
   }
+  // 15/11: lembra o último toque (🛵/✅/↩️) por 60 s neste aparelho: a página fecha ao enviar e, se for reaberta
+  // pelo botão antigo antes dos botões novos chegarem, o card ainda vem com o estado velho.
+  const TOQUE_KEY = "cb_toque_entregas", TOQUE_MS = 60000;
+  function lerToques() {
+    try { return JSON.parse(localStorage.getItem(TOQUE_KEY) || "{}") || {}; } catch (e) { return {}; }
+  }
+  function guardarToque(x, st) {
+    try {
+      const m = lerToques(), agora = Date.now();
+      for (const k in m) if (!(agora - m[k].t < TOQUE_MS)) delete m[k];
+      m[x.ped] = { a: st, t: agora, de: x.saiu ? "saiu" : "pend" };
+      localStorage.setItem(TOQUE_KEY, JSON.stringify(m));
+    } catch (e) {}
+  }
+  function toqueRecente(x) {   // ms que faltam (0 = normal)
+    const r = lerToques()[x.ped];
+    if (!r || r.de !== (x.saiu ? "saiu" : "pend")) return 0;
+    const falta = TOQUE_MS - (Date.now() - r.t);
+    return falta > 0 && falta <= TOQUE_MS ? falta : 0;
+  }
   function status(x, st, b) {
-    if (enviando.has(x.ped)) return;
+    if (enviando.has(x.ped) || toqueRecente(x)) return;
     // 15/11: ✅ Entregue só depois do 🛵 Saiu (o motor também recusa)
     if (st === "entregue" && !x.saiu) { aviso("Marque 🛵 Saiu primeiro (com o entregador selecionado)."); return; }
     const ent = entDe(x);
-    const mandar = texto => { enviando.add(x.ped); if (b) travar(b); enviarBot(texto); };
+    const mandar = texto => { enviando.add(x.ped); guardarToque(x, st); if (b) travar(b); enviarBot(texto); };
     if (st === "entregue" && x.cobrar > 0) {
       pagamentoEntrega(x, pg => mandar(`🚚 ENTREGA ${x.ped}: entregue${ent ? " · " + ent : ""} · ${pg}`));
       return;
@@ -652,24 +682,29 @@ function montarEntregas() {
     const rota = temEnd(x) ? `<button type="button" class="cb-rota" data-rota="${p}" aria-label="Rota até o cliente">🗺️</button>`
       : `<span class="cb-rota off" aria-label="Sem endereço">🗺️</span>`;
     const st = x.saiu ? `🛵 saiu ${esc(x.saida)}` : "🕓 pendente";
-    return `<div class="en-item ${x.saiu ? "saiu" : "pend"}">${rota}`
+    const espera = toqueRecente(x) > 0, off = espera ? " disabled" : "";
+    return `<div class="en-item ${x.saiu ? "saiu" : "pend"}"><div class="en-canto"><span class="en-chip">${st}</span>${rota}</div>`
       + `<div class="cb-nome">${esc(x.nome)} ${esc(cod)}</div>`
       + `<div class="en-ped">${p}</div>`
       + `<div class="cb-li">📍 ${esc([x.reg || "sem região", x.end].filter(Boolean).join(" · "))}</div>`
       + (x.cobrar > 0 ? `<div class="cb-li">💰 Cobrar nesta entrega: <b>${reais(x.cobrar)}</b></div>` : `<div class="cb-li en-pago">✅ Já pago</div>`)
       + blocoDeve(x)
-      + `<div class="en-st${x.saiu ? " saiu" : ""}">${st}</div>`
+      + (espera ? `<div class="en-aguarda">⏳ enviado, aguardando atualização</div>` : "")
       + `<div class="en-acoes">`
       + (ent ? `<button type="button" class="zap" data-a="zap" data-p="${p}">🚚 Enviar ao ${esc(nomeEnt(ent))}</button>` : "")
       + `<button type="button" class="en-sel" data-a="sel" data-p="${p}">👤 Selecionar entregador</button>`
-      + (x.saiu ? `<button type="button" data-a="pendente" data-p="${p}">↩️ Pendente</button>`
-                : `<button type="button" data-a="saiu" data-p="${p}">🛵 Saiu</button>`)
-      + `<button type="button" data-a="entregue" data-p="${p}">✅ Entregue</button></div>`
+      + (x.saiu ? `<button type="button" data-a="pendente" data-p="${p}"${off}>↩️ Pendente</button>`
+                : `<button type="button" data-a="saiu" data-p="${p}"${off}>🛵 Saiu</button>`)
+      + `<button type="button" data-a="entregue" data-p="${p}"${off}>✅ Entregue</button></div>`
       + `<div class="cb-cel">${pilulaCel(x.cel, `data-cli="${p}"`, "Abrir a conversa com o cliente no WhatsApp")}</div>`
       + `</div>`;
   };
+  let reMostrar = null;
   function mostrar() {
     const el = $("#en_lista");
+    clearTimeout(reMostrar);
+    const prox = Math.min(...lista.map(toqueRecente).filter(n => n > 0), Infinity);
+    if (prox !== Infinity) reMostrar = setTimeout(mostrar, prox + 200);
     el.innerHTML = lista.length ? lista.map(cartao).join("") : `<div class="cb-vazio">✅ Nenhuma entrega pendente.</div>`;
     const achar = p => lista.find(x => x.ped === p);
     const rota = x => abrirRota({ nome: x.nome, end: x.end, reg: x.reg, cep: x.cep }, true);
