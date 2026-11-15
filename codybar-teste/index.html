@@ -215,6 +215,11 @@
   .en-item.pend { background: var(--bg); border-top: 1px solid color-mix(in srgb, var(--txt) 25%, transparent);
                   border-bottom: 1px solid color-mix(in srgb, var(--txt) 25%, transparent); }
   .en-item.saiu { background: var(--campo); border-top: 0; border-bottom: 0; }
+  /* 15/11 (teste visual, PEND_BRANCO): 🕓 pendente = fundo BRANCO nos dois temas, texto escuro, borda cinza fina; 🛵 saiu não muda.
+     Para voltar: apagar este bloco (backup index.html.bak-20261115-e37). */
+  .en-item.pend { --bg: #ffffff; --txt: #1b1b1b; --dica: #6b6b70; --campo: #ececf0;
+                  background: #ffffff; color: #1b1b1b; border: 1px solid #d4d4d9; }
+  .en-item.pend .en-acoes button:not(.zap) { background: #ececf0; border-color: #d4d4d9; color: #1b1b1b; }
   .en-item.saiu .en-acoes button:not(.zap) { background: var(--bg); }
   .cb-cancelar { width: 100%; margin-top: 12px; padding: 12px; border: 1px solid var(--dica); border-radius: 12px;
                  background: none; color: var(--txt); font: inherit; font-size: 14px; cursor: pointer; }
