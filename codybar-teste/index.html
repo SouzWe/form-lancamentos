@@ -177,6 +177,8 @@
   .en-item { position: relative; padding: 16px 0 14px; border-bottom: 1px solid rgba(127, 127, 127, .5);
              border-bottom-color: color-mix(in srgb, var(--txt) 50%, transparent); }
   .en-ped { color: var(--dica); font-size: 12px; margin-top: 2px; }
+  /* 17/11 (E4 toda venda no card): etiqueta do Eu entrego */
+  .en-eu { display: inline-block; margin-left: 6px; padding: 1px 8px; border-radius: 999px; border: 1px solid currentColor; font-size: 11px; }
   .en-st { font-size: 14px; margin-top: 3px; font-weight: 600; }
   .en-st.saiu { color: var(--fixo); }
   .en-pago { color: var(--ok); }
@@ -482,10 +484,19 @@ function montarEntregas() {
   const lerEsc = p => { try { return localStorage.getItem(CHAVE + p) || ""; } catch (e) { return ""; } };
   const guardarEsc = (p, id) => { try { localStorage.setItem(CHAVE + p, id); localStorage.setItem(CHAVE + "ultimo", id); } catch (e) {} };
   const lista = ENTREGAS_LISTA.map(e => ({ ped: e[0], cli: e[1], nome: e[2], cel: e[3], reg: e[4] || "", end: e[5] || "",
-    ref: e[6] || "", cep: String(e[7] || ""), cobrar: Number(e[8]) || 0, saiu: e[9] === 1, saida: e[10] || "", ent: e[11] || "",
+    ref: e[6] || "", cep: String(e[7] || ""), cobrar: Number(e[8]) || 0, saiu: e[9] === 1, saida: e[10] || "", ent: e[11] === "@" ? "" : e[11] || "", eu: e[11] === "@",
     // 14/11: 13º-16º = deve no total, débitos em aberto (inclui esta entrega), talão, situação do talão (só se deve além desta entrega)
     deve: e.length > 12 ? { total: Number(e[12]) || 0, aberto: Number(e[13]) || 0, talao: Number(e[14]) || 0, tsit: String(e[15] || "") } : null }));
-  const entDe = x => x.ent || (ENTREGADORES.some(g => g[0] === lerEsc(x.ped)) ? lerEsc(x.ped) : "");
+  // 17/11 (E2): o entregador pode vir da Venda nova (planilha). Antes do 🛵 Saiu, a escolha feita no card vale mais
+  // (inclusive "-" = removido no card). Depois do Saiu vale o da planilha. Eu entrego não tem entregador.
+  const valido = id => ENTREGADORES.some(g => g[0] === id);
+  const entDe = x => {
+    if (x.eu) return "";
+    const l = lerEsc(x.ped);
+    if (x.saiu) return x.ent || (valido(l) ? l : "");
+    if (l === "-") return "";
+    return valido(l) ? l : valido(x.ent) ? x.ent : "";
+  };
   const destino = x => [x.end, x.reg, cepFmt(x.cep)].filter(Boolean).join(", ");
   const temEnd = x => !!(x.end || x.cep);
   function mensagem(x) {
@@ -526,7 +537,7 @@ function montarEntregas() {
     fundo.querySelectorAll("[data-ent]").forEach(b => b.onclick = () => { fechar(); depois(ENTREGADORES.find(g => g[0] === b.dataset.ent)); });
     document.body.appendChild(fundo);
   }
-  const esquecerEsc = p => { try { localStorage.removeItem(CHAVE + p); } catch (e) {} };
+  const esquecerEsc = p => { try { localStorage.setItem(CHAVE + p, "-"); } catch (e) {} };   // 17/11: "-" = removido (o da venda não volta)
   // 💬 Enviar ao entregador: abre o WhatsApp NO NÚMERO DELE com a mensagem pronta e copia o endereço (não envia sozinho)
   // 15/11: escolher ≠ enviar. "🚚 Enviar ao <nome>" só aparece com entregador escolhido e abre direto o WhatsApp dele.
   function mandarAoEntregador(x) {
@@ -539,7 +550,7 @@ function montarEntregas() {
   // "Remover entregador" só com escolha feita e antes do 🛵 Saiu.
   function selecionarEntregador(x) {
     escolherEntregador(`👤 Entregador da entrega de ${x.nome}`, g => { guardarEsc(x.ped, g[0]); mostrar(); },
-      { atual: entDe(x), limpar: !x.saiu && !x.ent && entDe(x) ? () => { esquecerEsc(x.ped); mostrar(); } : null });
+      { atual: entDe(x), limpar: !x.saiu && entDe(x) ? () => { esquecerEsc(x.ped); mostrar(); } : null });
   }
   // 💬 do cliente (14/11): abre a conversa com ele, sem texto pronto
   function abrirCliente(x) {
@@ -660,7 +671,7 @@ function montarEntregas() {
       pagamentoEntrega(x, pg => mandar(`🚚 ENTREGA ${x.ped}: entregue${ent ? " · " + ent : ""} · ${pg}`));
       return;
     }
-    if (st === "saiu" && !ent) {
+    if (st === "saiu" && !ent && !x.eu) {
       escolherEntregador(`🛵 Quem saiu com a entrega de ${x.nome}?`, g => { guardarEsc(x.ped, g[0]); mandar(`🚚 ENTREGA ${x.ped}: saiu · ${g[0]}`); });
       return;
     }
@@ -688,7 +699,7 @@ function montarEntregas() {
     const espera = toqueRecente(x) > 0, off = espera ? " disabled" : "";
     return `<div class="en-item ${x.saiu ? "saiu" : "pend"}"><div class="en-canto"><span class="en-chip">${st}</span>${rota}</div>`
       + `<div class="cb-nome">${esc(x.nome)} ${esc(cod)}</div>`
-      + `<div class="en-ped">${p}</div>`
+      + `<div class="en-ped">${p}${x.eu ? ` <span class="en-eu">🙋 Eu entrego</span>` : ""}</div>`
       + `<div class="cb-li">📍 ${esc([x.reg || "sem região", x.end].filter(Boolean).join(" · "))}</div>`
       + (x.cobrar > 0 ? `<div class="cb-li">💰 Cobrar nesta entrega: <b>${reais(x.cobrar)}</b></div>` : `<div class="cb-li en-pago">✅ Já pago</div>`)
       + blocoDeve(x)
@@ -699,6 +710,7 @@ function montarEntregas() {
       + (x.saiu
         ? `<button type="button" data-a="pendente" data-p="${p}"${off}>↩️ Pendente</button>`
           + `<button type="button" data-a="entregue" data-p="${p}"${off}>✅ Entregue</button>`
+        : x.eu ? `<button type="button" class="en-full" data-a="saiu" data-p="${p}"${off}>🛵 Saiu</button>`   // 17/11: Eu entrego
         : (ent ? `<button type="button" class="zap" data-a="zap" data-p="${p}">🚚 Enviar ao ${esc(nomeEnt(ent))}</button>` : "")
           + `<button type="button" class="en-sel" data-a="sel" data-p="${p}">👤 Selecionar entregador</button>`
           + `<button type="button" class="en-full" data-a="saiu" data-p="${p}"${off}>🛵 Saiu</button>`)
@@ -1045,6 +1057,7 @@ const FRETE_ERRO = "Região sem frete definido: escolha Eu entrego ou defina o f
 const freteErro = () => comEntregador() && !(freteValor() > 0) ? FRETE_ERRO : "";
 const freteRot = () => `Frete (${regiaoEntrega()}): ${reais(freteValor())}`;
 function mostrarFrete() {
+  const eb = $("#ent_box"); if (eb) eb.classList.toggle("oculto", !comEntregador());   // 17/11 (E2): só com 🚚 Entregador
   const d = $("#frete_dica");
   if (!d) return;
   const e = freteErro(), fv = freteValor();
@@ -1106,7 +1119,9 @@ const PAGAMENTO_HTML = `<fieldset><legend>Pagamento</legend>
 const ENTREGA_HTML = `<fieldset id="fs-entrega"><legend>Entrega</legend>
       <div class="entrega" id="entrega_box"><label><input type="radio" name="entrega" value="vendedor" checked> Eu entrego</label>
         <label><input type="radio" name="entrega" value="entregador"> 🚚 Entregador</label></div>
-      <div class="dica oculto" id="frete_dica"></div></fieldset>`;
+      <div class="dica oculto" id="frete_dica"></div>
+      ${tipo === "venda" && ENTREGADORES.length ? `<div id="ent_box" class="oculto"><label for="v_ent">Entregador (opcional)</label>
+        <select id="v_ent"><option value="">Decidir depois</option>${ENTREGADORES.map(g => `<option value="${esc(g[0])}">${esc(g[1])}</option>`).join("")}</select></div>` : ""}</fieldset>`;
 const COBRANCA_HTML = `<fieldset id="fs-cobranca"><legend>Cobrança</legend>
       ${CAMPO("cobranca", "Data de cobrança *", "date")}${HORA_COBRANCA}</fieldset>`;
 // Celular do cliente já cadastrado (08/11): Venda nova e Débitos › Já cadastrado
@@ -1240,7 +1255,9 @@ function montarTexto() {
     const cob = quitou ? ["Cobrança: não tem (venda quitada)"]
       : [`${pg > 0 ? `Restante ${reais(t - pg)} · data` : "Data"} de cobrança: ${br(val("cobranca"))}`, ...linhaHoraCobranca()];
     // 13/11 (E2 🚚): Eu entrego = nenhuma linha nova; 🚚 Entregador = "Entrega: 🚚 Entregador" + linha do Frete
-    return [...(comEntregador() ? ["Entrega: 🚚 Entregador"] : []), ...linhasDesconto(), `Total: ${reais(t)}`, "", ...pago, ...cob];
+    // 17/11 (E2): entregador escolhido na Venda nova → "Entregador: Nome (ENT-NN)" logo abaixo
+    const eg = comEntregador() && tipo === "venda" ? ENTREGADORES.find(g => g[0] === val("v_ent")) : null;
+    return [...(comEntregador() ? ["Entrega: 🚚 Entregador", ...(eg ? [`Entregador: ${eg[1]} (${eg[0]})`] : [])] : []), ...linhasDesconto(), `Total: ${reais(t)}`, "", ...pago, ...cob];
   };
   if (tipo === "venda") {
     return ["🛒 FORMULÁRIO VENDA NOVA", "", `Cliente: ${nomeCliente()}`, ...(clienteEscolhido ? [linhaCel()] : []), `Data da venda: ${br(val("data"))}`,
