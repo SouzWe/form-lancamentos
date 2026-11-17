@@ -193,7 +193,13 @@
   .en-pago { color: var(--ok); }
   /* 17/11 (E5c): data/hora da venda embaixo do nº do pedido (mesma fonte); só o valor a cobrar em verde */
   .en-item .en-ped.en-data { margin-top: 0; }
-  .en-data .en-hr { margin-left: 2.5em; }
+  /* 17/11 (E6): linha de baixo = "17/11 11:43 · etiqueta" inteira (só desvia do 🗺️, não do chip) */
+  .en-item .en-ped.en-data { padding-right: 56px; text-overflow: clip; }
+  .en-data .en-eu { margin-left: 0; }
+  /* 17/11 (E6 etapa B): abas 🕓 Pedidos / 🛵 A caminho + aviso de cliente com 2+ pedidos (linha sempre presente) */
+  .en-abas { margin-bottom: 4px; }
+  .en-item .en-junto { font-size: 13px; color: var(--fixo); }
+  .en-item.pend .en-junto { color: #b26b00; }
   .en-valor { color: var(--ok); }
   .en-acoes { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 10px; }
   .en-acoes button { padding: 10px 4px; border: 1px solid transparent; border-radius: 10px; background: var(--campo);
@@ -681,7 +687,7 @@ function montarEntregas() {
     // 15/11: ✅ Entregue só depois do 🛵 Saiu (o motor também recusa)
     if (st === "entregue" && !x.saiu) { aviso("Marque 🛵 Saiu primeiro (com o entregador selecionado)."); return; }
     const ent = entDe(x);
-    const mandar = texto => { enviando.add(x.ped); guardarToque(x, st); if (b) travar(b); enviarBot(texto); };
+    const mandar = texto => { enviando.add(x.ped); guardarToque(x, st); if (b) travar(b); mostrar(); enviarBot(texto); };   // 17/11 (E6): mostrar() já muda o card de aba
     if (st === "entregue" && x.cobrar > 0) {
       pagamentoEntrega(x, pg => mandar(`🚚 ENTREGA ${x.ped}: entregue${ent ? " · " + ent : ""} · ${pg}`));
       return;
@@ -706,6 +712,20 @@ function montarEntregas() {
       + `<div class="deve">${d.talao > 0 && dataTalao ? dataTalao : `<span class="en-vazio">&nbsp;</span>`}</div>`
       + `</div>`;
   }
+  // 17/11 (E6 etapa B): cliente com 2+ pedidos abertos (pendente ou saiu) → "📦 N pedidos deste cliente"
+  // e, se mais de um tiver frete, "⚠️ frete em N pedidos". Só aviso: não muda valor nem cobrança.
+  function junto(x) {
+    const dele = lista.filter(o => o.cli === x.cli && abaDe(o));
+    if (dele.length < 2) return "";
+    const f = dele.filter(o => o.frete > 0).length;
+    return `📦 ${dele.length} pedidos deste cliente${f > 1 ? ` · ⚠️ frete em ${f} pedidos` : ""}`;
+  }
+  // aba do card: o toque recente (🛵/↩️/✅, até os botões novos chegarem) já move o card; ✅ Entregue tira da lista
+  function abaDe(x) {
+    const r = lerToques()[x.ped];
+    if (r && toqueRecente(x) > 0) return r.a === "entregue" ? "" : r.a === "saiu" ? "saiu" : r.a === "pendente" ? "pend" : (x.saiu ? "saiu" : "pend");
+    return x.saiu ? "saiu" : "pend";
+  }
   const cartao = x => {
     const cod = String(x.cli).replace(/\D/g, "").slice(-4), ent = entDe(x), p = esc(x.ped);
     const rota = temEnd(x) ? `<button type="button" class="cb-rota" data-rota="${p}" aria-label="Rota até o cliente">🗺️</button>`
@@ -715,14 +735,16 @@ function montarEntregas() {
     return `<div class="en-item ${x.saiu ? "saiu" : "pend"}"><div class="en-canto"><span class="en-chip">${st}</span>${rota}</div>`
       + `<div class="cb-nome">${esc(nomeCod(x.nome, cod))}</div>`
       // 17/11 (E5c): etiqueta = nome do entregador escolhido (sem entregador = 🛵 Motoboy); data e hora da venda na linha de baixo
-      + `<div class="en-ped">${p} <span class="en-eu">${x.eu ? "🙋 Eu entrego" : "🛵 " + esc(ent ? nomeEnt(ent) : "Motoboy")}</span></div>`
-      + `<div class="en-ped en-data">${x.hora ? `<span>${esc(x.hora.slice(0, 5))}</span><span class="en-hr">${esc(x.hora.slice(6))}</span>` : `<span class="en-vazio">—</span>`}</div>`
+      // 17/11 (E6): linha do pedido só com o número; embaixo "DD/MM HH:MM · etiqueta" (etiqueta inteira)
+      + `<div class="en-ped">${p}</div>`
+      + `<div class="en-ped en-data">${x.hora ? esc(x.hora) : `<span class="en-vazio">—</span>`}  ·  <span class="en-eu">${x.eu ? "🙋 Eu entrego" : "🛵 " + esc(ent ? nomeEnt(ent) : "Motoboy")}</span></div>`
       // 17/11 (E5b): endereço em 2 linhas (bairro em cima, rua embaixo), sem rótulos; "—" se faltar
       + `<div class="en-end"><div class="cb-li">${x.reg ? esc(x.reg) : `<span class="en-vazio">sem região</span>`}</div>`
       + `<div class="cb-li">${x.end ? esc(x.end) : `<span class="en-vazio">—</span>`}</div></div>`
       + (x.cobrar > 0 ? `<div class="cb-li">💰 Cobrar nesta entrega: <b class="en-valor">${reais(x.cobrar)}</b></div>` : `<div class="cb-li en-pago">✅ Já pago</div>`)
       // 17/11 (E5): frete embaixo do valor (linha sempre presente; "—" sem frete)
       + `<div class="cb-li">🚚 Frete${x.reg && x.frete ? " (" + esc(x.reg) + ")" : ""}: ${x.frete ? reais(x.frete) : `<span class="en-vazio">—</span>`}</div>`
+      + `<div class="cb-li en-junto">${junto(x) || "&nbsp;"}</div>`   // 17/11 (E6): 📦 2+ pedidos do mesmo cliente
       + blocoDeve(x)
       + `<div class="en-acoes">`
       + (espera ? `<div class="en-proc">⏳ processando…</div>` : "")
@@ -739,13 +761,21 @@ function montarEntregas() {
       + `<div class="cb-cel">${pilulaCel(x.cel, `data-cli="${p}"`, "Abrir a conversa com o cliente no WhatsApp")}</div>`
       + `</div>`;
   };
-  let reMostrar = null;
+  let reMostrar = null, aba = "";
   function mostrar() {
     const el = $("#en_lista");
     clearTimeout(reMostrar);
     const prox = Math.min(...lista.map(toqueRecente).filter(n => n > 0), Infinity);
     if (prox !== Infinity) reMostrar = setTimeout(mostrar, prox + 200);
-    el.innerHTML = lista.length ? lista.map(cartao).join("") : `<div class="cb-vazio">✅ Nenhuma entrega pendente.</div>`;
+    // 17/11 (E6 etapa B): abas 🕓 Pedidos / 🛵 A caminho com contador; abre em Pedidos (ou A caminho se Pedidos vazio)
+    const nP = lista.filter(x => abaDe(x) === "pend").length, nS = lista.filter(x => abaDe(x) === "saiu").length;
+    if (!aba) aba = !nP && nS ? "saiu" : "pend";
+    const ab = $("#en_abas");
+    ab.innerHTML = `<button type="button" data-aba="pend"${aba === "pend" ? ' class="on"' : ""}>🕓 Pedidos (${nP})</button>`
+      + `<button type="button" data-aba="saiu"${aba === "saiu" ? ' class="on"' : ""}>🛵 A caminho (${nS})</button>`;
+    ab.querySelectorAll("[data-aba]").forEach(b => b.onclick = () => { aba = b.dataset.aba; mostrar(); });
+    const vis = lista.filter(x => abaDe(x) === aba);
+    el.innerHTML = vis.length ? vis.map(cartao).join("") : `<div class="cb-vazio">✅ Nenhum pedido aqui</div>`;
     const achar = p => lista.find(x => x.ped === p);
     const rota = x => abrirRota({ nome: x.nome, end: x.end, reg: x.reg, cep: x.cep }, true);
     el.querySelectorAll("button.cb-rota[data-rota]").forEach(b => b.onclick = () => rota(achar(b.dataset.rota)));
@@ -792,7 +822,7 @@ function montarEntregas() {
   document.querySelector(".sub").textContent = "Interno. O entregador recebe só a mensagem no WhatsApp. Saiu, Entregue e ↩️ gravam direto.";
   $("#enviar").remove();
   // 14/11 (1º teste): topo só com as entregas; cadastro de entregador no fim da página
-  form.innerHTML = `<div id="en_lista"></div>
+  form.innerHTML = `<div class="abas en-abas" id="en_abas"></div><div id="en_lista"></div>
     <div class="en-cad"><legend>Entregadores</legend>
       <div class="en-ents">${ENTREGADORES.length ? "🛵 " + ENTREGADORES.map(g => esc(g[1])).join(" · ") : "Nenhum entregador cadastrado ainda."}</div>
       <button type="button" class="add" id="en_add">+ Entregador</button>
