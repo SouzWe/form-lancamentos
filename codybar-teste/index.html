@@ -191,6 +191,10 @@
   .en-item .en-end .cb-li { margin-top: 0; }
   .en-st.saiu { color: var(--fixo); }
   .en-pago { color: var(--ok); }
+  /* 17/11 (E5c): data/hora da venda embaixo do nº do pedido (mesma fonte); só o valor a cobrar em verde */
+  .en-item .en-ped.en-data { margin-top: 0; }
+  .en-data .en-hr { margin-left: 2.5em; }
+  .en-valor { color: var(--ok); }
   .en-acoes { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 10px; }
   .en-acoes button { padding: 10px 4px; border: 1px solid transparent; border-radius: 10px; background: var(--campo);
                      color: var(--txt); font: inherit; font-size: 13px; cursor: pointer; }
@@ -706,15 +710,17 @@ function montarEntregas() {
     const cod = String(x.cli).replace(/\D/g, "").slice(-4), ent = entDe(x), p = esc(x.ped);
     const rota = temEnd(x) ? `<button type="button" class="cb-rota" data-rota="${p}" aria-label="Rota até o cliente">🗺️</button>`
       : `<span class="cb-rota off" aria-label="Sem endereço">🗺️</span>`;
-    const st = x.saiu ? `🛵 saiu ${esc(x.saida)}${ent ? " · " + esc(nomeEnt(ent)) : ""}` : `🕓 pendente${x.hora ? " " + esc(x.hora) : ""}`;   // 17/11: hora da venda
+    const st = x.saiu ? `🛵 saiu ${esc(x.saida)}${ent ? " · " + esc(nomeEnt(ent)) : ""}` : "🕓 pendente";   // 17/11 (E5c): hora da venda saiu do chip, vai embaixo do pedido
     const espera = toqueRecente(x) > 0, off = "";
     return `<div class="en-item ${x.saiu ? "saiu" : "pend"}"><div class="en-canto"><span class="en-chip">${st}</span>${rota}</div>`
       + `<div class="cb-nome">${esc(nomeCod(x.nome, cod))}</div>`
-      + `<div class="en-ped">${p} <span class="en-eu">${x.eu ? "🙋 Eu entrego" : "🛵 Motoboy"}</span></div>`
+      // 17/11 (E5c): etiqueta = nome do entregador escolhido (sem entregador = 🛵 Motoboy); data e hora da venda na linha de baixo
+      + `<div class="en-ped">${p} <span class="en-eu">${x.eu ? "🙋 Eu entrego" : "🛵 " + esc(ent ? nomeEnt(ent) : "Motoboy")}</span></div>`
+      + `<div class="en-ped en-data">${x.hora ? `<span>${esc(x.hora.slice(0, 5))}</span><span class="en-hr">${esc(x.hora.slice(6))}</span>` : `<span class="en-vazio">—</span>`}</div>`
       // 17/11 (E5b): endereço em 2 linhas (bairro em cima, rua embaixo), sem rótulos; "—" se faltar
       + `<div class="en-end"><div class="cb-li">${x.reg ? esc(x.reg) : `<span class="en-vazio">sem região</span>`}</div>`
       + `<div class="cb-li">${x.end ? esc(x.end) : `<span class="en-vazio">—</span>`}</div></div>`
-      + (x.cobrar > 0 ? `<div class="cb-li">💰 Cobrar nesta entrega: <b>${reais(x.cobrar)}</b></div>` : `<div class="cb-li en-pago">✅ Já pago</div>`)
+      + (x.cobrar > 0 ? `<div class="cb-li">💰 Cobrar nesta entrega: <b class="en-valor">${reais(x.cobrar)}</b></div>` : `<div class="cb-li en-pago">✅ Já pago</div>`)
       // 17/11 (E5): frete embaixo do valor (linha sempre presente; "—" sem frete)
       + `<div class="cb-li">🚚 Frete${x.reg && x.frete ? " (" + esc(x.reg) + ")" : ""}: ${x.frete ? reais(x.frete) : `<span class="en-vazio">—</span>`}</div>`
       + blocoDeve(x)
