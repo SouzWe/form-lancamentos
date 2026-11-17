@@ -180,6 +180,12 @@
   /* 17/11 (E4 toda venda no card): etiqueta do Eu entrego */
   .en-eu { display: inline-block; margin-left: 6px; padding: 1px 8px; border-radius: 999px; border: 1px solid currentColor; font-size: 11px; }
   .en-st { font-size: 14px; margin-top: 3px; font-weight: 600; }
+  /* 17/11 (E5 etapa A): card de tamanho fixo — cada linha numa linha só (texto longo vira "…"), bloco "quanto deve"
+     sempre com as mesmas linhas, área dos botões com altura reservada (botões alinhados embaixo) */
+  .en-item .cb-nome, .en-item .en-ped, .en-item .cb-li, .en-item .en-deve > div { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .en-item .en-acoes { min-height: 162px; align-content: end; }
+  .en-proc { grid-column: 1 / -1; align-self: end; text-align: center; font-size: 13px; color: var(--dica); padding: 6px 0; }
+  .en-vazio { color: var(--dica); }
   .en-st.saiu { color: var(--fixo); }
   .en-pago { color: var(--ok); }
   .en-acoes { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 10px; }
@@ -234,7 +240,6 @@
   .en-item.saiu .en-chip { background: color-mix(in srgb, var(--fixo) 18%, transparent); color: var(--fixo);
                            border: 1px solid color-mix(in srgb, var(--fixo) 55%, transparent); }
   /* 15/11: toque enviado há menos de 1 min e o estado ainda é o antigo → aviso + botões desativados */
-  .en-aguarda { font-size: 14px; font-weight: 600; margin-top: 10px; color: var(--dica); }
   .en-item.saiu .en-acoes button:not(.zap) { background: var(--bg); }
   .cb-cancelar { width: 100%; margin-top: 12px; padding: 12px; border: 1px solid var(--dica); border-radius: 12px;
                  background: none; color: var(--txt); font: inherit; font-size: 14px; cursor: pointer; }
@@ -299,6 +304,8 @@ function erroNumeroCel(v) {
 }
 
 // ---------- rota + cópia + link (13/11; globais desde 14/11: 🗺️ Cobranças e 🚚 Entregas usam os mesmos) ----------
+// 17/11 (E5): nome de uma palavra já vem com o número ("Emily 0008"): não repete o código
+const nomeCod = (nome, cod) => { const n = String(nome || "").trim(); return cod && n.endsWith(" " + cod) ? n : (n + " " + cod).trim(); };
 const escHtml = t => String(t).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 // abrirRota(x): x = { nome, end, reg ("" = sem região), cep (só números) }
 function abrirLink(url) {
@@ -413,7 +420,7 @@ function montarCobrancas() {
     const rota = x.end || x.cep
       ? `<button type="button" class="cb-rota" data-rota="${esc(x.id)}" aria-label="Rota até o cliente">🗺️</button>`
       : `<span class="cb-rota off" aria-label="Sem endereço">🗺️</span>`;
-    return `<div class="cb-item">${rota}<div class="cb-nome">${esc(x.nome)} ${esc(cod)}</div>`
+    return `<div class="cb-item">${rota}<div class="cb-nome">${esc(nomeCod(x.nome, cod))}</div>`
       + `<div class="cb-li">💸 ${reais(x.total)}</div>` + quando
       + (x.aberto > 0 ? `<div class="cb-li">🛒 Débitos em aberto: ${reais(x.aberto)}</div>` : "")
       + (x.talao > 0 ? `<div class="cb-li">📒 Talão: ${reais(x.talao)}</div>` : "")
@@ -486,7 +493,8 @@ function montarEntregas() {
   const lista = ENTREGAS_LISTA.map(e => ({ ped: e[0], cli: e[1], nome: e[2], cel: e[3], reg: e[4] || "", end: e[5] || "",
     ref: e[6] || "", cep: String(e[7] || ""), cobrar: Number(e[8]) || 0, saiu: e[9] === 1, saida: e[10] || "", ent: e[11] === "@" ? "" : e[11] || "", eu: e[11] === "@",
     // 14/11: 13º-16º = deve no total, débitos em aberto (inclui esta entrega), talão, situação do talão (só se deve além desta entrega)
-    deve: e.length > 12 ? { total: Number(e[12]) || 0, aberto: Number(e[13]) || 0, talao: Number(e[14]) || 0, tsit: String(e[15] || "") } : null }));
+    hora: e[16] || "", frete: Number(e[17]) || 0,
+    deve: e[12] != null ? { total: Number(e[12]) || 0, aberto: Number(e[13]) || 0, talao: Number(e[14]) || 0, tsit: String(e[15] || "") } : null }));
   // 17/11 (E2): o entregador pode vir da Venda nova (planilha). Antes do 🛵 Saiu, a escolha feita no card vale mais
   // (inclusive "-" = removido no card). Depois do Saiu vale o da planilha. Eu entrego não tem entregador.
   const valido = id => ENTREGADORES.some(g => g[0] === id);
@@ -560,9 +568,9 @@ function montarEntregas() {
   // 15/11: depois do 1º toque, 🛵/✅/↩️ do card ficam desativados e o tocado vira "⏳ aguarde…" (evita gravar 2×)
   const enviando = new Set();
   function travar(b) {
-    const card = b.closest(".en-item");
-    card.querySelectorAll('[data-a="saiu"],[data-a="entregue"],[data-a="pendente"]').forEach(o => { o.disabled = true; });
-    b.textContent = "⏳ aguarde…";
+    // 17/11 (E5): os botões somem e fica só "⏳ processando…" até chegar o botão novo
+    const ac = b.closest(".en-acoes");
+    if (ac) ac.innerHTML = `<div class="en-proc">⏳ processando…</div>`;
   }
   // 15/11: ✅ Entregue com valor a cobrar → folha "💰 Pagamento na entrega" (ela é a confirmação, como o "sim").
   // 💵 Recebeu (valor = restante, editável + forma obrigatória) ou ⏳ Não recebeu; se faltar algo: motivo + nova data
@@ -681,33 +689,35 @@ function montarEntregas() {
   // Ordem: nome+código (🗺️ no canto) → pedido → 📍 → 💰 → status · 🚚 entregador → 💬 → 🛵/✅ → WhatsApp do cliente (à direita)
   // 14/11: mesmo padrão do "quanto deve" (SOUL 09/11): 💸 total → 🛒 Débitos em aberto → 📒 talão + data. Bloco zerado some.
   function blocoDeve(x) {
-    const d = x.deve;
-    if (!d) return "";
+    // 17/11 (E5): sem 13º-16º = o cliente só deve esta entrega (aberto = cobrar, sem talão); linhas sempre presentes
+    const d = x.deve || { total: x.cobrar, aberto: x.cobrar, talao: 0, tsit: "" };
     const t = d.tsit, dataTalao = !t ? "" : t[0] === "v" ? `· ⚠️ vencida desde ${esc(t.slice(1))}`
       : t[0] === "c" ? `· cobrança ${esc(t.slice(1))}` : "· não tem data de cobrança";
     return `<div class="situacao en-deve"><div class="rot">Deve no total</div><div class="total">💸 <b>${reais(d.total)}</b></div>`
-      + (d.aberto > 0 ? `<div class="rot">Débitos em aberto:</div><div class="deve">🛒 <b>${reais(d.aberto)}</b></div>` : "")
-      + (d.talao > 0 ? `<div class="rot">Débito anterior:</div><div class="deve">📒 (talão): <b>${reais(d.talao)}</b></div>`
-        + (dataTalao ? `<div class="deve">${dataTalao}</div>` : "") : "")
+      + `<div class="rot">Débitos em aberto:</div><div class="deve">🛒 ${d.aberto > 0 ? `<b>${reais(d.aberto)}</b>` : `<span class="en-vazio">—</span>`}</div>`
+      + `<div class="rot">Débito anterior:</div><div class="deve">📒 (talão): ${d.talao > 0 ? `<b>${reais(d.talao)}</b>` : `<span class="en-vazio">—</span>`}</div>`
+      + `<div class="deve">${d.talao > 0 && dataTalao ? dataTalao : `<span class="en-vazio">&nbsp;</span>`}</div>`
       + `</div>`;
   }
   const cartao = x => {
     const cod = String(x.cli).replace(/\D/g, "").slice(-4), ent = entDe(x), p = esc(x.ped);
     const rota = temEnd(x) ? `<button type="button" class="cb-rota" data-rota="${p}" aria-label="Rota até o cliente">🗺️</button>`
       : `<span class="cb-rota off" aria-label="Sem endereço">🗺️</span>`;
-    const st = x.saiu ? `🛵 saiu ${esc(x.saida)}${ent ? " · " + esc(nomeEnt(ent)) : ""}` : "🕓 pendente";
-    const espera = toqueRecente(x) > 0, off = espera ? " disabled" : "";
+    const st = x.saiu ? `🛵 saiu ${esc(x.saida)}${ent ? " · " + esc(nomeEnt(ent)) : ""}` : `🕓 pendente${x.hora ? " " + esc(x.hora) : ""}`;   // 17/11: hora da venda
+    const espera = toqueRecente(x) > 0, off = "";
     return `<div class="en-item ${x.saiu ? "saiu" : "pend"}"><div class="en-canto"><span class="en-chip">${st}</span>${rota}</div>`
-      + `<div class="cb-nome">${esc(x.nome)} ${esc(cod)}</div>`
-      + `<div class="en-ped">${p}${x.eu ? ` <span class="en-eu">🙋 Eu entrego</span>` : ""}</div>`
+      + `<div class="cb-nome">${esc(nomeCod(x.nome, cod))}</div>`
+      + `<div class="en-ped">${p} <span class="en-eu">${x.eu ? "🙋 Eu entrego" : "🛵 Motoboy"}</span></div>`
       + `<div class="cb-li">📍 ${esc([x.reg || "sem região", x.end].filter(Boolean).join(" · "))}</div>`
       + (x.cobrar > 0 ? `<div class="cb-li">💰 Cobrar nesta entrega: <b>${reais(x.cobrar)}</b></div>` : `<div class="cb-li en-pago">✅ Já pago</div>`)
+      // 17/11 (E5): frete embaixo do valor (linha sempre presente; "—" sem frete)
+      + `<div class="cb-li">🚚 Frete${x.reg && x.frete ? " (" + esc(x.reg) + ")" : ""}: ${x.frete ? reais(x.frete) : `<span class="en-vazio">—</span>`}</div>`
       + blocoDeve(x)
-      + (espera ? `<div class="en-aguarda">⏳ enviado, aguardando atualização</div>` : "")
       + `<div class="en-acoes">`
+      + (espera ? `<div class="en-proc">⏳ processando…</div>` : "")
       // 15/11 (BOTOES_ETAPA): cada etapa só com os botões dela. 🕓 pendente: Enviar/Selecionar/🛵 Saiu (sem ✅).
       // 🛵 saiu: só ↩️ Pendente + ✅ Entregue (não se troca entregador depois da saída).
-      + (x.saiu
+      + (espera ? "" : x.saiu
         ? `<button type="button" data-a="pendente" data-p="${p}"${off}>↩️ Pendente</button>`
           + `<button type="button" data-a="entregue" data-p="${p}"${off}>✅ Entregue</button>`
         : x.eu ? `<button type="button" class="en-full" data-a="saiu" data-p="${p}"${off}>🛵 Saiu</button>`   // 17/11: Eu entrego
@@ -1120,8 +1130,29 @@ const ENTREGA_HTML = `<fieldset id="fs-entrega"><legend>Entrega</legend>
       <div class="entrega" id="entrega_box"><label><input type="radio" name="entrega" value="vendedor" checked> Eu entrego</label>
         <label><input type="radio" name="entrega" value="entregador"> 🚚 Entregador</label></div>
       <div class="dica oculto" id="frete_dica"></div>
-      ${tipo === "venda" && ENTREGADORES.length ? `<div id="ent_box" class="oculto"><label for="v_ent">Entregador (opcional)</label>
-        <select id="v_ent"><option value="">Decidir depois</option>${ENTREGADORES.map(g => `<option value="${esc(g[0])}">${esc(g[1])}</option>`).join("")}</select></div>` : ""}</fieldset>`;
+      ${(tipo === "venda" || tipo === "cliente") && ENTREGADORES.length ? `<div id="ent_box" class="oculto"><label>Entregador (opcional)</label>
+        <input type="hidden" id="v_ent"><button type="button" class="add" id="v_ent_btn">👤 Escolher entregador</button></div>` : ""}</fieldset>`;
+// 17/11 (E5): ao tocar em 🚚 Entregador a lista abre na hora (folha de baixo); "Decidir depois" deixa em branco
+function abrirListaEnt() {
+  const atual = val("v_ent"), fundo = document.createElement("div");
+  fundo.className = "cb-fundo";
+  fundo.innerHTML = `<div class="cb-folha" role="dialog" aria-label="Entregador">
+    <div class="cb-folha-topo"><b>🚚 Quem vai entregar?</b><button type="button" class="cb-folha-x" aria-label="Fechar">✕</button></div>
+    <div class="en-lista-ent">${ENTREGADORES.map(g => `<button type="button" data-ent="${esc(g[0])}">🛵 ${esc(g[1])}${g[0] === atual ? " ✓" : ""}</button>`).join("")}</div>
+    <button type="button" class="cb-cancelar" data-depois="1">Decidir depois</button></div>`;
+  const fechar = () => fundo.remove();
+  const por = id => { $("#v_ent").value = id; fechar(); mostrarEnt(); };
+  fundo.onclick = e => { if (e.target === fundo) fechar(); };
+  fundo.querySelector(".cb-folha-x").onclick = fechar;
+  fundo.querySelector("[data-depois]").onclick = () => por("");
+  fundo.querySelectorAll("[data-ent]").forEach(b => b.onclick = () => por(b.dataset.ent));
+  document.body.appendChild(fundo);
+}
+function mostrarEnt() {
+  const b = $("#v_ent_btn"); if (!b) return;
+  const g = ENTREGADORES.find(g => g[0] === val("v_ent"));
+  b.textContent = g ? `🛵 ${g[1]} · trocar` : "👤 Escolher entregador";
+}
 const COBRANCA_HTML = `<fieldset id="fs-cobranca"><legend>Cobrança</legend>
       ${CAMPO("cobranca", "Data de cobrança *", "date")}${HORA_COBRANCA}</fieldset>`;
 // Celular do cliente já cadastrado (08/11): Venda nova e Débitos › Já cadastrado
@@ -1228,6 +1259,9 @@ ligarBusca(); ligarCadastro(); ligarCel("c_cel"); ligarCel("v_cel"); ligarCep();
 ajustarModalTalao();   // 12/11: Débitos abre no Já cadastrado (sem Desconto %)
 // 13/11 (E2 🚚): trocar a Entrega ou o bairro (Cliente novo) refaz o frete e o total
 document.querySelectorAll("input[name=entrega]").forEach(r => r.addEventListener("change", somar));
+// 17/11 (E5): 🚚 Entregador abre a lista na hora; botão "trocar" reabre
+document.querySelectorAll("input[name=entrega][value=entregador]").forEach(r => r.addEventListener("change", () => { if ($("#ent_box")) abrirListaEnt(); }));
+if ($("#v_ent_btn")) $("#v_ent_btn").onclick = abrirListaEnt;
 if ($("#c_bairro")) $("#c_bairro").addEventListener("change", somar);
 if ($("#c_bairro_novo")) $("#c_bairro_novo").addEventListener("input", somar);
 
@@ -1256,7 +1290,7 @@ function montarTexto() {
       : [`${pg > 0 ? `Restante ${reais(t - pg)} · data` : "Data"} de cobrança: ${br(val("cobranca"))}`, ...linhaHoraCobranca()];
     // 13/11 (E2 🚚): Eu entrego = nenhuma linha nova; 🚚 Entregador = "Entrega: 🚚 Entregador" + linha do Frete
     // 17/11 (E2): entregador escolhido na Venda nova → "Entregador: Nome (ENT-NN)" logo abaixo
-    const eg = comEntregador() && tipo === "venda" ? ENTREGADORES.find(g => g[0] === val("v_ent")) : null;
+    const eg = comEntregador() ? ENTREGADORES.find(g => g[0] === val("v_ent")) : null;
     return [...(comEntregador() ? ["Entrega: 🚚 Entregador", ...(eg ? [`Entregador: ${eg[1]} (${eg[0]})`] : [])] : []), ...linhasDesconto(), `Total: ${reais(t)}`, "", ...pago, ...cob];
   };
   if (tipo === "venda") {
