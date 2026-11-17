@@ -730,14 +730,15 @@ function montarEntregas() {
     const cod = String(x.cli).replace(/\D/g, "").slice(-4), ent = entDe(x), p = esc(x.ped);
     const rota = temEnd(x) ? `<button type="button" class="cb-rota" data-rota="${p}" aria-label="Rota até o cliente">🗺️</button>`
       : `<span class="cb-rota off" aria-label="Sem endereço">🗺️</span>`;
-    const st = x.saiu ? `🛵 saiu ${esc(x.saida)}${ent ? " · " + esc(nomeEnt(ent)) : ""}` : "🕓 pendente";   // 17/11 (E5c): hora da venda saiu do chip, vai embaixo do pedido
+    const st = x.saiu ? "🛵 saiu" : "🕓 pendente";   // 17/11 (E6b): chip curto; a hora da saída vai embaixo do pedido   // 17/11 (E5c): hora da venda saiu do chip, vai embaixo do pedido
     const espera = toqueRecente(x) > 0, off = "";
     return `<div class="en-item ${x.saiu ? "saiu" : "pend"}"><div class="en-canto"><span class="en-chip">${st}</span>${rota}</div>`
       + `<div class="cb-nome">${esc(nomeCod(x.nome, cod))}</div>`
       // 17/11 (E5c): etiqueta = nome do entregador escolhido (sem entregador = 🛵 Motoboy); data e hora da venda na linha de baixo
       // 17/11 (E6): linha do pedido só com o número; embaixo "DD/MM HH:MM · etiqueta" (etiqueta inteira)
       + `<div class="en-ped">${p}</div>`
-      + `<div class="en-ped en-data">${x.hora ? esc(x.hora) : `<span class="en-vazio">—</span>`}  ·  <span class="en-eu">${x.eu ? "🙋 Eu entrego" : "🛵 " + esc(ent ? nomeEnt(ent) : "Motoboy")}</span></div>`
+      // 17/11 (E6b): um horário por card — pendente = hora da venda; saiu = "saiu DD/MM HH:MM" (hora da saída)
+      + `<div class="en-ped en-data">${x.saiu ? (x.saida ? "saiu " + esc(x.saida) : "saiu") : x.hora ? esc(x.hora) : `<span class="en-vazio">—</span>`}  ·  <span class="en-eu">${x.eu ? "🙋 Eu entrego" : "🛵 " + esc(ent ? nomeEnt(ent) : "Motoboy")}</span></div>`
       // 17/11 (E5b): endereço em 2 linhas (bairro em cima, rua embaixo), sem rótulos; "—" se faltar
       + `<div class="en-end"><div class="cb-li">${x.reg ? esc(x.reg) : `<span class="en-vazio">sem região</span>`}</div>`
       + `<div class="cb-li">${x.end ? esc(x.end) : `<span class="en-vazio">—</span>`}</div></div>`
