@@ -737,8 +737,8 @@ function montarEntregas() {
       // 17/11 (E5c): etiqueta = nome do entregador escolhido (sem entregador = 🛵 Motoboy); data e hora da venda na linha de baixo
       // 17/11 (E6): linha do pedido só com o número; embaixo "DD/MM HH:MM · etiqueta" (etiqueta inteira)
       + `<div class="en-ped">${p}</div>`
-      // 17/11 (E6b): um horário por card — pendente = hora da venda; saiu = "saiu DD/MM HH:MM" (hora da saída)
-      + `<div class="en-ped en-data">${x.saiu ? (x.saida ? "saiu " + esc(x.saida) : "saiu") : x.hora ? esc(x.hora) : `<span class="en-vazio">—</span>`}  ·  <span class="en-eu">${x.eu ? "🙋 Eu entrego" : "🛵 " + esc(ent ? nomeEnt(ent) : "Motoboy")}</span></div>`
+      // 17/11 (E6b): um horário por card — pendente = hora da venda; saiu = "DD/MM HH:MM" da saída (sem a palavra "saiu": o chip já diz)
+      + `<div class="en-ped en-data">${x.saiu ? (x.saida ? esc(x.saida) : `<span class="en-vazio">—</span>`) : x.hora ? esc(x.hora) : `<span class="en-vazio">—</span>`}  ·  <span class="en-eu">${x.eu ? "🙋 Eu entrego" : "🛵 " + esc(ent ? nomeEnt(ent) : "Motoboy")}</span></div>`
       // 17/11 (E5b): endereço em 2 linhas (bairro em cima, rua embaixo), sem rótulos; "—" se faltar
       + `<div class="en-end"><div class="cb-li">${x.reg ? esc(x.reg) : `<span class="en-vazio">sem região</span>`}</div>`
       + `<div class="cb-li">${x.end ? esc(x.end) : `<span class="en-vazio">—</span>`}</div></div>`
