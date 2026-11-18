@@ -54,7 +54,9 @@
             background: var(--btn); color: var(--btn-txt); font: 600 17px/1 inherit; }
   /* 18/11 (E9): Venda nova / 1ª compra — o salvar vira 3 botões no MESMO estilo do modal da 🗺️ Cobranças
      (classes .pg-op.tres: mesmo tamanho, emoji ao lado do texto, o texto quebra sozinho se não couber) */
-  .salvar3 { position: fixed; left: 16px; right: 16px; bottom: 16px; }
+  /* 18/11 (E9 ajuste): no fim do formulário (não flutuante), na cor azul do botão selecionado (.pg-op button.on) */
+  .salvar3 { margin-top: 16px; }
+  .salvar3.pg-op button { background: var(--btn); color: var(--btn-txt); font-weight: 600; }
   .salvar3 button.erro-campo { border-color: var(--erro); }
   .salvar3 .en-proc { grid-column: 1 / -1; background: var(--campo); border-radius: 12px; padding: 14px 0; }
   .salvar3.oculto { display: none; }
@@ -1935,7 +1937,7 @@ function salvarComo(modo) {
   abrirListaEnt(salvar, () => { MODO_ENTREGA = "vendedor"; ENT_ESC = ""; somar(); });   // ✕ = não salva, tira o frete
 }
 if (tipo === "venda" || tipo === "cliente") {
-  $("#enviar").insertAdjacentHTML("afterend", `<div class="salvar3 pg-op tres oculto" id="salvar3">
+  form.insertAdjacentHTML("afterend", `<div class="salvar3 pg-op tres oculto" id="salvar3">
     <button type="button" id="sv_direto">💾 Salvar direto</button>
     <button type="button" id="sv_eu">🙋 Eu entrego</button>
     <button type="button" id="sv_moto">🛵 Motoboy entrega</button></div>`);
