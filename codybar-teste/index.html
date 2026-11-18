@@ -258,6 +258,8 @@
   .pg-conta .falta b { color: var(--erro); }
   .pg-conta .maior { color: var(--erro); font-weight: 600; justify-content: center; padding-top: 6px; }
   .pg-ok:disabled { opacity: .45; cursor: not-allowed; }
+  /* 18/11 (E8d): mesma conta na folha 💰 do ✅ Entregue, com a linha ─── antes do Falta */
+  .pg-conta.com-linha .falta, .pg-conta.com-linha .maior { border-top: 1px solid var(--dica); margin-top: 4px; padding-top: 6px; }
   /* 18/11 (E8b): ✏️ pequeno ao lado de toda pílula do WhatsApp do cliente */
   .cel-lapis { border: 0; background: transparent; font-size: 17px; line-height: 1; padding: 6px 2px 6px 8px; cursor: pointer; vertical-align: middle; }
   .pg-cel { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: center; margin-top: 10px; text-align: left; }
@@ -867,6 +869,7 @@ function montarEntregas() {
       <div class="pg-op"><button type="button" data-op="sim">💵 Recebeu</button><button type="button" data-op="nao">⏳ Não recebeu</button></div>
       <div id="pg_rec" hidden><label for="pg_valor">Valor recebido *</label>
         <input id="pg_valor" type="text" inputmode="decimal" value="${virgula(x.cobrar)}">
+        <div class="pg-conta com-linha" id="pg_conta" hidden></div>
         <label>Forma *</label>${chips("forma", FORMAS)}</div>
       <div id="pg_falta" hidden><label>Motivo *</label>${chips("motivo", MOTIVOS.map(m => [m, m]))}
         <div class="dupla"><div><label for="pg_data">Nova data de cobrança *</label><input id="pg_data" type="date" min="${hojeLocal()}"></div>
@@ -890,6 +893,12 @@ function montarEntregas() {
       $f("#pg_falta").hidden = !(op === "nao" || (op === "sim" && v >= 0 && v < x.cobrar - 0.005));
       $f("#pg_obs_caixa").hidden = $f("#pg_ok").hidden = $f("#pg_recibo").hidden = !op;   // 17/11 (E7): + recibo
       fundo.querySelectorAll('[data-date], input[type=date], select').forEach(el => el.classList.toggle("vazio", !el.value));
+      // 18/11 (E8d): Cobrar / Recebido / Falta a cada tecla no 💵 Recebeu (só na tela, não grava)
+      const c = $f("#pg_conta"), rec = v > 0 ? v : 0, maior = op === "sim" && rec > x.cobrar + 0.005;
+      c.hidden = op !== "sim"; $f("#pg_ok").disabled = maior;
+      if (op === "sim") c.innerHTML = `<div><span>Cobrar:</span><b>${reais(x.cobrar)}</b></div><div><span>Recebido:</span><b>${reais(rec)}</b></div>`
+        + (maior ? `<div class="maior">⚠️ maior que o valor do pedido</div>`
+                 : `<div class="falta"><span>Falta:</span><b>${reais(Math.round((x.cobrar - rec) * 100) / 100)}</b></div>`);
     };
     fundo.onclick = e => { if (e.target === fundo) fechar(); };
     $f(".cb-folha-x").onclick = fechar;
