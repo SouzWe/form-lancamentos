@@ -52,6 +52,12 @@
   .desconto { margin-top: 8px; }
   .enviar { position: fixed; left: 16px; right: 16px; bottom: 16px; padding: 14px; border: 0; border-radius: 12px;
             background: var(--btn); color: var(--btn-txt); font: 600 17px/1 inherit; }
+  /* 18/11 (E9): Venda nova / 1ª compra — o salvar vira 3 botões no MESMO estilo do modal da 🗺️ Cobranças
+     (classes .pg-op.tres: mesmo tamanho, emoji ao lado do texto, o texto quebra sozinho se não couber) */
+  .salvar3 { position: fixed; left: 16px; right: 16px; bottom: 16px; }
+  .salvar3 button.erro-campo { border-color: var(--erro); }
+  .salvar3 .en-proc { grid-column: 1 / -1; background: var(--campo); border-radius: 12px; padding: 14px 0; }
+  .salvar3.oculto { display: none; }
   .aviso { color: var(--erro); font-size: 14px; min-height: 20px; }
   /* 08/11 (Wellington): erro ao enviar aparece no TOPO da tela (acima do teclado), em faixa vermelha */
   .aviso:not(:empty) { position: fixed; left: 16px; right: 16px; top: 8px; z-index: 50; min-height: 0;
@@ -1370,7 +1376,9 @@ const pctTxt = () => String(descPct()).replace(".", ",") + "%";
 // 13/11 (E2 🚚): Entrega. Eu entrego = sem frete (venda igual a antes). 🚚 Entregador = frete fixo da região
 // (link do botão, f = {região: frete}), somado DEPOIS do desconto (o desconto vale só nos produtos).
 // Região sem frete (ou cliente sem região, ou bairro novo do "Outros") = borda vermelha + frase, não envia.
-const comEntregador = () => !!document.querySelector("input[name=entrega][value=entregador]:checked");
+// 18/11 (E9): a escolha saiu do meio do formulário e virou o botão de salvar (balcao | vendedor | entregador)
+let MODO_ENTREGA = "vendedor", ENT_ESC = "";
+const comEntregador = () => MODO_ENTREGA === "entregador";
 function regiaoEntrega() {
   if (tipo === "venda") return clienteEscolhido ? String(clienteEscolhido[2] || "").trim() : "";
   if (tipo === "cliente") { const s = val("c_bairro"); return s === OUTRO ? val("c_bairro_novo") : s; }
@@ -1414,6 +1422,7 @@ function pagamento() {
   if (!$("#pg_valor")) return;
   const t = Math.round(totalVenda() * 100) / 100, pg = num(val("pg_valor"));
   if (tipo === "cliente") $("#bloco-compra").classList.toggle("oculto", !temCompra());   // 08/11: sem produto = só cadastro
+  botoesSalvar();   // 18/11 (E9)
   const quitou = pg > 0 && t > 0 && pg >= t - 0.005;
   if (tipo === "divida")   // 11/11: a frase mora na COBRANÇA → quitado esconde só data/horário, não o bloco
     [...$("#fs-cobranca").children].forEach(el => { if (el.tagName !== "LEGEND" && el.id !== "pg_dica") el.classList.toggle("oculto", quitou); });
@@ -1444,33 +1453,23 @@ const PAGAMENTO_HTML = `<fieldset><legend>Pagamento</legend>
       <div class="dupla"><div>${CAMPO("pg_valor", "Pago agora R$", "text", 'inputmode="decimal" placeholder="0,00"')}</div>
         <div><label for="pg_forma">Forma</label><select id="pg_forma"><option value="">—</option><option>dinheiro</option><option>pix</option><option>cartão</option></select></div></div>
       <div class="dica" id="pg_dica">Não pagou agora? Deixe em branco e marque a data da cobrança.</div></fieldset>`;
-// 13/11 (E2 🚚): Entrega, logo antes do Pagamento (Venda nova e Primeira compra). Padrão = Eu entrego.
-const ENTREGA_HTML = `<fieldset id="fs-entrega"><legend>Entrega</legend>
-      <div class="entrega" id="entrega_box"><label><input type="radio" name="entrega" value="vendedor" checked> Eu entrego</label>
-        <label><input type="radio" name="entrega" value="entregador"> 🚚 Entregador</label></div>
-      <div class="dica oculto" id="frete_dica"></div>
-      ${(tipo === "venda" || tipo === "cliente") && ENTREGADORES.length ? `<div id="ent_box" class="oculto"><label>Entregador (opcional)</label>
-        <input type="hidden" id="v_ent"><button type="button" class="add" id="v_ent_btn">👤 Escolher entregador</button></div>` : ""}</fieldset>`;
+// 18/11 (E9): o bloco Entrega do meio do formulário saiu; a escolha é o botão de salvar (💾 / 🙋 / 🛵)
+const ENTREGA_HTML = "";
 // 17/11 (E5): ao tocar em 🚚 Entregador a lista abre na hora (folha de baixo); "Decidir depois" deixa em branco
-function abrirListaEnt() {
-  const atual = val("v_ent"), fundo = document.createElement("div");
+function abrirListaEnt(depois, cancelou) {
+  const atual = ENT_ESC, fundo = document.createElement("div");
   fundo.className = "cb-fundo";
   fundo.innerHTML = `<div class="cb-folha" role="dialog" aria-label="Entregador">
     <div class="cb-folha-topo"><b>🚚 Quem vai entregar?</b><button type="button" class="cb-folha-x" aria-label="Fechar">✕</button></div>
     <div class="en-lista-ent">${ENTREGADORES.map(g => `<button type="button" data-ent="${esc(g[0])}">🛵 ${esc(g[1])}${g[0] === atual ? " ✓" : ""}</button>`).join("")}</div>
     <button type="button" class="cb-cancelar" data-depois="1">Decidir depois</button></div>`;
-  const fechar = () => fundo.remove();
-  const por = id => { $("#v_ent").value = id; fechar(); mostrarEnt(); };
-  fundo.onclick = e => { if (e.target === fundo) fechar(); };
-  fundo.querySelector(".cb-folha-x").onclick = fechar;
+  const fechar = () => fundo.remove(), sair = () => { fechar(); if (cancelou) cancelou(); };
+  const por = id => { ENT_ESC = id; fechar(); if (depois) depois(); };
+  fundo.onclick = e => { if (e.target === fundo) sair(); };
+  fundo.querySelector(".cb-folha-x").onclick = sair;
   fundo.querySelector("[data-depois]").onclick = () => por("");
   fundo.querySelectorAll("[data-ent]").forEach(b => b.onclick = () => por(b.dataset.ent));
   document.body.appendChild(fundo);
-}
-function mostrarEnt() {
-  const b = $("#v_ent_btn"); if (!b) return;
-  const g = ENTREGADORES.find(g => g[0] === val("v_ent"));
-  b.textContent = g ? `🛵 ${g[1]} · trocar` : "👤 Escolher entregador";
 }
 const COBRANCA_HTML = `<fieldset id="fs-cobranca"><legend>Cobrança</legend>
       ${CAMPO("cobranca", "Data de cobrança *", "date")}${HORA_COBRANCA}</fieldset>`;
@@ -1576,11 +1575,7 @@ if (tipo === "venda") form.insertAdjacentHTML("beforeend", `<fieldset><legend>�
 linhaProduto();   // linha vazia é ignorada no envio (primeira compra do cliente novo é opcional)
 ligarBusca(); ligarCadastro(); ligarCel("c_cel"); ligarCel("v_cel"); ligarCep();
 ajustarModalTalao();   // 12/11: Débitos abre no Já cadastrado (sem Desconto %)
-// 13/11 (E2 🚚): trocar a Entrega ou o bairro (Cliente novo) refaz o frete e o total
-document.querySelectorAll("input[name=entrega]").forEach(r => r.addEventListener("change", somar));
-// 17/11 (E5): 🚚 Entregador abre a lista na hora; botão "trocar" reabre
-document.querySelectorAll("input[name=entrega][value=entregador]").forEach(r => r.addEventListener("change", () => { if ($("#ent_box")) abrirListaEnt(); }));
-if ($("#v_ent_btn")) $("#v_ent_btn").onclick = abrirListaEnt;
+// 13/11 (E2 🚚): trocar o bairro (Cliente novo) refaz o frete e o total
 if ($("#c_bairro")) $("#c_bairro").addEventListener("change", somar);
 if ($("#c_bairro_novo")) $("#c_bairro_novo").addEventListener("input", somar);
 
@@ -1609,8 +1604,10 @@ function montarTexto() {
       : [`${pg > 0 ? `Restante ${reais(t - pg)} · data` : "Data"} de cobrança: ${br(val("cobranca"))}`, ...linhaHoraCobranca()];
     // 13/11 (E2 🚚): Eu entrego = nenhuma linha nova; 🚚 Entregador = "Entrega: 🚚 Entregador" + linha do Frete
     // 17/11 (E2): entregador escolhido na Venda nova → "Entregador: Nome (ENT-NN)" logo abaixo
-    const eg = comEntregador() ? ENTREGADORES.find(g => g[0] === val("v_ent")) : null;
-    return [...(comEntregador() ? ["Entrega: 🚚 Entregador", ...(eg ? [`Entregador: ${eg[1]} (${eg[0]})`] : [])] : []), ...linhasDesconto(), `Total: ${reais(t)}`, "", ...pago, ...cob];
+    // 18/11 (E9): 💾 Salvar direto = "Entrega: 💾 Salvar direto (…)" (sem card); 🙋 Eu entrego = nenhuma linha (igual a hoje)
+    const eg = comEntregador() ? ENTREGADORES.find(g => g[0] === ENT_ESC) : null;
+    return [...(MODO_ENTREGA === "balcao" ? ["Entrega: 💾 Salvar direto (cliente levou na hora, sem card na 🚚 Entregas)"] : []),
+      ...(comEntregador() ? ["Entrega: 🚚 Entregador", ...(eg ? [`Entregador: ${eg[1]} (${eg[0]})`] : [])] : []), ...linhasDesconto(), `Total: ${reais(t)}`, "", ...pago, ...cob];
   };
   if (tipo === "venda") {
     return ["🛒 FORMULÁRIO VENDA NOVA", "", `Cliente: ${nomeCliente()}`, ...(clienteEscolhido ? [linhaCel()] : []), `Data da venda: ${br(val("data"))}`,
@@ -1870,7 +1867,7 @@ function camposDoErro(e) {
   else if (e.startsWith("Falta a data do recebimento")) m = um("rec_data");
   else if (/falta a data da cobrança|Falta a data da cobrança/.test(e)) m = um("cobranca");
   else if (e.startsWith("Desconto precisa")) m = um("desc_pct");
-  else if (e === FRETE_ERRO) m = um("entrega_box");   // 13/11 (E2 🚚)
+  else if (e === FRETE_ERRO) m = um("sv_moto");   // 13/11 (E2 🚚); 18/11 (E9): o botão 🛵 Motoboy entrega
   m = m.filter(Boolean);
   return { marcar: m, ir: m[0] || null };
 }
@@ -1916,6 +1913,37 @@ $("#enviar").onclick = () => {
   if (erro) return;
   entregar(montarTexto());
 };
+// 18/11 (E9): Venda nova e Cliente novo com compra = 3 botões [💾 Salvar direto] [🙋 Eu entrego] [🛵 Motoboy entrega].
+// Cada toque já salva (direto no bot, sem "sim"): os botões somem e fica "⏳ processando…".
+// Cliente novo só com cadastro continua com o Enviar de hoje.
+function botoesSalvar() {
+  const s = $("#salvar3"); if (!s) return;
+  const tres = tipo === "venda" || (tipo === "cliente" && temCompra());
+  s.classList.toggle("oculto", !tres); $("#enviar").classList.toggle("oculto", tres);
+}
+function salvarComo(modo) {
+  const nadaLancado = !produtos().some(p => p.nome || p.busca) && !val("ant_valor") && !val("pg_valor");
+  if ($("#pergunta") && val("pergunta") && nadaLancado) { perguntar(); return; }
+  MODO_ENTREGA = modo; if (modo !== "entregador") ENT_ESC = "";
+  somar();   // 🛵 soma o frete da região no total; 💾 / 🙋 sem frete
+  const erro = conferir();
+  mostrarAviso(erro); marcarErro(erro);
+  if (erro) return;
+  const salvar = () => { $("#salvar3").innerHTML = `<div class="en-proc">⏳ processando…</div>`; entregar(montarTexto()); };
+  if (modo !== "entregador") { salvar(); return; }
+  if (!ENTREGADORES.length) { mostrarAviso("Nenhum entregador cadastrado: use + Entregador na 🚚 Entregas."); return; }
+  abrirListaEnt(salvar, () => { MODO_ENTREGA = "vendedor"; ENT_ESC = ""; somar(); });   // ✕ = não salva, tira o frete
+}
+if (tipo === "venda" || tipo === "cliente") {
+  $("#enviar").insertAdjacentHTML("afterend", `<div class="salvar3 pg-op tres oculto" id="salvar3">
+    <button type="button" id="sv_direto">💾 Salvar direto</button>
+    <button type="button" id="sv_eu">🙋 Eu entrego</button>
+    <button type="button" id="sv_moto">🛵 Motoboy entrega</button></div>`);
+  $("#sv_direto").onclick = () => salvarComo("balcao");
+  $("#sv_eu").onclick = () => salvarComo("vendedor");
+  $("#sv_moto").onclick = () => salvarComo("entregador");
+  botoesSalvar();
+}
 // 08/11 (Wellington): basta o cliente escolhido (os dados dele já aparecem); sem cliente, bloqueia.
 function perguntar() {
   if (!clienteEscolhido) { mostrarAviso("Escolha o cliente para perguntar."); return; }
