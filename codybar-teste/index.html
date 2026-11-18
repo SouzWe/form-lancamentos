@@ -247,7 +247,8 @@
   .pg-conta .falta b { color: var(--erro); }
   .pg-conta .maior { color: var(--erro); font-weight: 600; justify-content: center; padding-top: 6px; }
   .pg-ok:disabled { opacity: .45; cursor: not-allowed; }
-  button.cb-num.sem-num { cursor: pointer; font: inherit; }
+  /* 18/11 (E8b): ✏️ pequeno ao lado de toda pílula do WhatsApp do cliente */
+  .cel-lapis { border: 0; background: transparent; font-size: 17px; line-height: 1; padding: 6px 2px 6px 8px; cursor: pointer; vertical-align: middle; }
   .pg-cel { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: center; margin-top: 10px; text-align: left; }
   .pg-cel label { width: 100%; margin: 0; }
   .pg-cel input { flex: 1; min-width: 150px; }
@@ -441,6 +442,59 @@ function pilulaRecibo(cel) {
   if (!d || erroNumeroCel(cel)) return `<span class="cb-num fixo">⚠️ ✖ sem número</span>`;
   return `<button type="button" class="cb-num ok" data-recibo="1">💬 Recibo no WhatsApp ›</button>`;
 }
+// 18/11 (E8b): ✏️ WhatsApp do cliente (🗺️ Cobranças, cards da 🚚 Entregas, folha do ✅ Entregue).
+// O número salvo vale neste aparelho por 1 h (até os botões novos chegarem com ele) e SUBSTITUI o do link.
+const CEL_KEY = "cb_cel_salvo", CEL_MS = 3600e3;
+function celSalvo(id) {
+  try { const m = JSON.parse(localStorage.getItem(CEL_KEY) || "{}") || {}, r = m[id];
+    return r && Date.now() - r.t < CEL_MS ? r.cel : ""; } catch (e) { return ""; }
+}
+function guardarCel(id, cel) {
+  try { const m = JSON.parse(localStorage.getItem(CEL_KEY) || "{}") || {}, ag = Date.now();
+    for (const k in m) if (!(ag - m[k].t < CEL_MS)) delete m[k];
+    m[id] = { cel, t: ag }; localStorage.setItem(CEL_KEY, JSON.stringify(m)); } catch (e) {}
+}
+const fmtCelCli = d => d.length === 10 ? `(${d.slice(0, 2)}) ${d.slice(2, 6)}-${d.slice(6)}` : `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`;
+const lapisCel = attrs => `<button type="button" class="cel-lapis" ${attrs} aria-label="Editar o WhatsApp do cliente">✏️</button>`;
+function mandarBot(txt) {
+  if (tg && tg.platform && tg.platform !== "unknown") { tg.sendData(txt); return; }   // fecha a janela e manda ao bot
+  $("#saida").hidden = false; $("#saida").textContent = txt;                           // fora do Telegram: só mostra
+}
+// campo "📱 WhatsApp do cliente" já preenchido com o número atual + [Salvar] [✕]. salvar(d) recebe os dígitos (sem 55).
+function campoCel(caixa, atual, salvar, fechar, erro) {
+  const d0 = digitosNumero(atual);
+  caixa.innerHTML = `<div class="pg-cel"><label>📱 WhatsApp do cliente</label>
+    <input type="tel" inputmode="numeric" maxlength="15" placeholder="(__) _____-____" autocomplete="off" value="${d0 ? fmtCelCli(d0) : ""}">
+    <button type="button" class="salvar">Salvar</button><button type="button" class="fechar" aria-label="Fechar">✕</button></div>`;
+  const inp = caixa.querySelector("input");
+  inp.oninput = () => { const d = inp.value.replace(/\D/g, "").slice(0, 11);
+    inp.value = d.length > 7 ? `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}` : d.length > 2 ? `(${d.slice(0, 2)}) ${d.slice(2)}` : d; erro(""); };
+  caixa.querySelector(".fechar").onclick = () => { erro(""); fechar(); };
+  caixa.querySelector(".salvar").onclick = () => {
+    const d = digitosNumero(inp.value);
+    if (!d) { erro("Coloque o WhatsApp com DDD: (00) 90000-0000."); inp.focus(); return; }
+    const e = erroNumeroCel(d); if (e) { erro(e); inp.focus(); return; }
+    if (d === d0) { erro("É o mesmo número de agora."); inp.focus(); return; }
+    erro(""); salvar(d);
+  };
+  inp.focus();
+}
+// ✏️ fora de um pagamento (cards): folha só do número; Salvar grava SÓ o celular (📱 WHATSAPP → cliente-celular)
+function folhaCel(id, nome, atual, depois) {
+  const fundo = document.createElement("div");
+  fundo.className = "cb-fundo";
+  fundo.innerHTML = `<div class="cb-folha pg-folha" role="dialog" aria-label="WhatsApp do cliente">
+    <div class="cb-folha-topo"><b>📱 ${escHtml(nome)}</b><button type="button" class="cb-folha-x" aria-label="Fechar">✕</button></div>
+    <div class="pg-recibo" id="fc_caixa"></div><div class="pg-erro" id="fc_erro"></div></div>`;
+  const fechar = () => fundo.remove();
+  fundo.onclick = e => { if (e.target === fundo) fechar(); };
+  fundo.querySelector(".cb-folha-x").onclick = fechar;
+  document.body.appendChild(fundo);
+  campoCel(fundo.querySelector("#fc_caixa"), atual, d => {
+    guardarCel(id, d); fechar(); if (depois) depois(d);
+    mandarBot(`📱 WHATSAPP ${id}: ${d}`);
+  }, fechar, t => { fundo.querySelector("#fc_erro").textContent = t; });
+}
 function abrirRecibo(cel, texto) {
   let d = digitosNumero(cel); if (d.length > 11 && d.startsWith("55")) d = d.slice(2);
   if (d) abrirLink(`https://wa.me/55${d}?text=${encodeURIComponent(texto)}`);
@@ -462,15 +516,6 @@ function montarCobrancas() {
       : d.length === 10 ? `(${d.slice(0, 2)}) ${d.slice(2, 6)}-${d.slice(6)}` : d;
   };
   // Data da cobrança = a mais próxima entre venda e talão; vencida tem prioridade (a mais antiga)
-  // 18/11 (E8): número salvo pelo ✏️ do modal (o link só traz o número novo depois que os botões forem reenviados)
-  function celSalvo(id) {
-    try { const m = JSON.parse(localStorage.getItem("cb_cel_salvo") || "{}") || {}, r = m[id];
-      return r && Date.now() - r.t < 30 * 864e5 ? r.cel : ""; } catch (e) { return ""; }
-  }
-  function guardarCel(id, cel) {
-    try { const m = JSON.parse(localStorage.getItem("cb_cel_salvo") || "{}") || {}; m[id] = { cel, t: Date.now() };
-      localStorage.setItem("cb_cel_salvo", JSON.stringify(m)); } catch (e) {}
-  }
   const devedores = CLIENTES.map(c => {
     const talao = Number(c[4]) || 0, aberto = Number(c[5]) || 0, total = Math.round((talao + aberto) * 100) / 100;
     const ds = [];
@@ -479,7 +524,7 @@ function montarCobrancas() {
     const venc = ds.filter(x => x.venc).sort((a, b) => a.d.localeCompare(b.d));
     const outras = ds.filter(x => !x.venc).sort((a, b) => a.d.localeCompare(b.d));
     const cob = venc[0] || outras[0] || null;
-    return { id: c[0], nome: c[1], reg: c[2] || SEM_REG, cel: c[3] || celSalvo(c[0]), talao, aberto, total, cob, ordem: cob ? (cob.venc ? 0 : 1) : 2,
+    return { id: c[0], nome: c[1], reg: c[2] || SEM_REG, cel: celSalvo(c[0]) || c[3], talao, aberto, total, cob, ordem: cob ? (cob.venc ? 0 : 1) : 2,
              end: String(c[12] || "").trim(), cep: String(c[13] || "").replace(/\D/g, "") };   // 13/11: 13º/14º = endereço, CEP
   }).filter(x => x.total > 0.004);   // só quem deve (talão + vendas em aberto)
   const regioes = [...BAIRROS];
@@ -504,7 +549,7 @@ function montarCobrancas() {
       + (x.aberto > 0 ? `<div class="cb-li">🛒 Débitos em aberto: ${reais(x.aberto)}</div>` : "")
       + (x.talao > 0 ? `<div class="cb-li">📒 Talão: ${reais(x.talao)}</div>` : "")
       + (proc ? `<div class="cb-anotar">⏳ processando…</div>` : `<div class="cb-anotar">💰 Toque para anotar pagamento</div>`)
-      + `<div class="cb-cel">${pilula(x)}</div></div>`;
+      + `<div class="cb-cel">${pilula(x)}${lapisCel(`data-lapis="${esc(x.id)}"`)}</div></div>`;   // 18/11 (E8b): + ✏️
   };
   const ordenar = l => l.sort((a, b) => a.ordem - b.ordem || (a.cob && b.cob ? a.cob.d.localeCompare(b.cob.d) : 0) || sem(a.nome).localeCompare(sem(b.nome)));
   const soma = l => Math.round(l.reduce((s, x) => s + x.total, 0) * 100) / 100;
@@ -581,33 +626,18 @@ function montarCobrancas() {
                  : `<div class="falta"><span>Falta:</span><b>${reais(Math.round((x.total - rec) * 100) / 100)}</b></div>`);
     };
     // 18/11 (E8): pílula do recibo; sem número = "⚠️ ✖ sem número ✏️" (toque abre o campo do WhatsApp)
-    const mostraCel = d => `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`;
+    // 18/11 (E8b): pílula + ✏️ sempre (sem número: [✖ sem número] ✏️; salvo agora: 💬 com o número novo)
     const recibo = () => {
       const r = $f("#pg_recibo"), d = digitosNumero(x.cel);
-      r.innerHTML = celNovo ? `<button type="button" class="cb-num ok" data-recibo="1">💬 ${mostraCel(d)} ›</button>`
-        : !d || erroNumeroCel(x.cel) ? `<button type="button" class="cb-num fixo sem-num" data-editcel="1">⚠️ ✖ sem número ✏️</button>`
-        : pilulaRecibo(x.cel);
+      r.innerHTML = (celNovo ? `<button type="button" class="cb-num ok" data-recibo="1">💬 ${fmtCelCli(d)} ›</button>` : pilulaRecibo(x.cel))
+        + lapisCel('data-editcel="1"');
       const rb = r.querySelector("[data-recibo]");
       if (rb) rb.onclick = () => { const v = validar(); if (v) abrirRecibo(x.cel, reciboTexto(x.nome, v.rec, forma, v.falta, v.dIso, v.hora)); };
       const eb = r.querySelector("[data-editcel]");
       if (eb) eb.onclick = editarCel;
     };
     function editarCel() {
-      const r = $f("#pg_recibo");
-      r.innerHTML = `<div class="pg-cel"><label for="pg_cel">📱 WhatsApp do cliente</label>
-        <input id="pg_cel" type="tel" inputmode="numeric" maxlength="15" placeholder="(__) _____-____" autocomplete="off">
-        <button type="button" class="salvar">Salvar</button><button type="button" class="fechar" aria-label="Fechar">✕</button></div>`;
-      const inp = r.querySelector("#pg_cel");
-      inp.oninput = () => { const d = inp.value.replace(/\D/g, "").slice(0, 11);
-        inp.value = d.length > 7 ? `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}` : d.length > 2 ? `(${d.slice(0, 2)}) ${d.slice(2)}` : d; erro(""); };
-      r.querySelector(".fechar").onclick = () => { erro(""); recibo(); };
-      r.querySelector(".salvar").onclick = () => {
-        const d = digitosNumero(inp.value);
-        if (d.length !== 11) { erro(erroNumeroCel(d) || "Coloque o WhatsApp com DDD: (00) 90000-0000."); inp.focus(); return; }
-        const e = erroNumeroCel(d); if (e) { erro(e); inp.focus(); return; }
-        celNovo = d; x.cel = d; guardarCel(x.id, d); erro(""); recibo();
-      };
-      inp.focus();
+      campoCel($f("#pg_recibo"), x.cel, d => { celNovo = d; x.cel = d; guardarCel(x.id, d); recibo(); }, recibo, erro);
     }
     const atualizar = () => {
       fundo.querySelectorAll("[data-op]").forEach(b => b.classList.toggle("on", b.dataset.op === op));
@@ -669,6 +699,10 @@ function montarCobrancas() {
         pagamento(devedores.find(x => x.id === c.dataset.pg));
       });
       el.querySelectorAll("button.cb-num[data-id]").forEach(b => b.onclick = () => cobrarWhatsApp(devedores.find(x => x.id === b.dataset.id)));
+      el.querySelectorAll("button.cel-lapis[data-lapis]").forEach(b => b.onclick = () => {   // 18/11 (E8b): grava só o número
+        const x = devedores.find(x => x.id === b.dataset.lapis);
+        folhaCel(x.id, x.nome, x.cel, d => { x.cel = d; mostrar(); });
+      });
       el.querySelectorAll("button.cb-rota[data-rota]").forEach(b => b.onclick = () => {
         const x = devedores.find(x => x.id === b.dataset.rota);
         abrirRota(x && { ...x, reg: x.reg === SEM_REG ? "" : x.reg });
@@ -713,7 +747,7 @@ function montarEntregas() {
   const CHAVE = "cb_ent_";
   const lerEsc = p => { try { return localStorage.getItem(CHAVE + p) || ""; } catch (e) { return ""; } };
   const guardarEsc = (p, id) => { try { localStorage.setItem(CHAVE + p, id); localStorage.setItem(CHAVE + "ultimo", id); } catch (e) {} };
-  const lista = ENTREGAS_LISTA.map(e => ({ ped: e[0], cli: e[1], nome: e[2], cel: e[3], reg: e[4] || "", end: e[5] || "",
+  const lista = ENTREGAS_LISTA.map(e => ({ ped: e[0], cli: e[1], nome: e[2], cel: celSalvo(e[1]) || e[3], reg: e[4] || "", end: e[5] || "",
     ref: e[6] || "", cep: String(e[7] || ""), cobrar: Number(e[8]) || 0, saiu: e[9] === 1, saida: e[10] || "", ent: e[11] === "@" ? "" : e[11] || "", eu: e[11] === "@",
     // 14/11: 13º-16º = deve no total, débitos em aberto (inclui esta entrega), talão, situação do talão (só se deve além desta entrega)
     hora: e[16] || "", frete: Number(e[17]) || 0,
@@ -823,12 +857,13 @@ function montarEntregas() {
       <div id="pg_obs_caixa" hidden><label for="pg_obs">📝 Observação (opcional)</label>
         <textarea id="pg_obs" maxlength="200" placeholder="ex.: cliente pediu pra passar sexta"></textarea></div>
       <div class="pg-erro" id="pg_erro"></div>
-      <div class="pg-recibo" id="pg_recibo" hidden>${pilulaRecibo(x.cel)}</div>
+      <div class="pg-recibo" id="pg_recibo" hidden></div>
       <button type="button" class="pg-ok" id="pg_ok" hidden>✅ Confirmar entrega</button>
       <button type="button" class="cb-cancelar" data-cancelar="1">✕ Cancelar</button></div>`;
     const $f = s => fundo.querySelector(s);
-    let op = "", forma = "", motivo = "";
-    const fechar = () => fundo.remove();
+    let op = "", forma = "", motivo = "", celNovo = "", feito = false;
+    // 18/11 (E8b): número salvo pelo ✏️ e não confirmado vai sozinho ao bot ao fechar (grava só o celular)
+    const fechar = () => { fundo.remove(); if (celNovo && !feito) { feito = true; mandarBot(`📱 WHATSAPP ${x.cli}: ${celNovo}`); } };
     const erro = t => { $f("#pg_erro").textContent = t; };
     // a parte "falta" aparece no ⏳ Não recebeu e no 💵 Recebeu com valor menor que o restante
     const atualizar = () => {
@@ -851,8 +886,7 @@ function montarEntregas() {
     $f("#pg_valor").oninput = () => { erro(""); atualizar(); };
     $f("#pg_data").onchange = $f("#pg_hora").onchange = () => { erro(""); atualizar(); };
     // 17/11 (E7): 💬 Recibo no WhatsApp — mesma conferência do Confirmar, sem gravar nada
-    const rb = $f("[data-recibo]");
-    if (rb) rb.onclick = () => {
+    const clickRecibo = () => {
       const rec = op === "sim" ? lerValor($f("#pg_valor").value) : 0;
       if (op === "sim" && (!(rec > 0) || rec > x.cobrar + 0.005)) { erro("Informe o valor recebido certo antes do recibo."); return; }
       if (rec > 0 && !forma) { erro("Escolha a forma: dinheiro, pix ou cartão."); return; }
@@ -860,6 +894,16 @@ function montarEntregas() {
       if (falta > 0.005 && !dIso) { erro("Escolha a nova data de cobrança antes do recibo."); return; }
       abrirRecibo(x.cel, reciboTexto(x.nome, rec, forma, falta, dIso, $f("#pg_hora").value, x.ped));
     };
+    // 18/11 (E8b): pílula do recibo + ✏️ (campo já preenchido; o número novo vai junto no Confirmar)
+    const recibo = () => {
+      const r = $f("#pg_recibo"), d = digitosNumero(x.cel);
+      r.innerHTML = (celNovo ? `<button type="button" class="cb-num ok" data-recibo="1">💬 ${fmtCelCli(d)} ›</button>` : pilulaRecibo(x.cel))
+        + lapisCel('data-editcel="1"');
+      const rb = r.querySelector("[data-recibo]"); if (rb) rb.onclick = clickRecibo;
+      r.querySelector("[data-editcel]").onclick = () => campoCel(r, x.cel, d => {
+        celNovo = d; lista.forEach(o => { if (o.cli === x.cli) o.cel = d; }); guardarCel(x.cli, d); recibo(); }, recibo, erro);
+    };
+    recibo();
     $f("#pg_ok").onclick = () => {
       const rec = op === "sim" ? lerValor($f("#pg_valor").value) : 0;
       if (op === "sim") {
@@ -877,7 +921,8 @@ function montarEntregas() {
       const partes = [`💰 recebeu ${virgula(rec)}${rec > 0 ? " no " + forma : ""}`];
       if (falta) partes.push(`motivo: ${motivo}`, `cobrança: ${dIso.split("-").reverse().join("/")}${hora ? " " + hora : ""}`);
       if (obs) partes.push(`obs: ${obs}`);
-      fechar();
+      if (celNovo) partes.push(`whatsapp: ${celNovo}`);   // 18/11 (E8b): entrega --celular
+      feito = true; fechar();
       confirmar(partes.join(" · "));
     };
     document.body.appendChild(fundo);
@@ -969,7 +1014,7 @@ function montarEntregas() {
       + `<div class="cb-li en-junto">${junto(x) || "&nbsp;"}</div>`   // 17/11 (E6): 📦 2+ pedidos do mesmo cliente
       + blocoDeve(x)
       // 18/11 (E6e): 💬 do cliente à direita, logo ACIMA dos botões (🛵 Saiu…)
-      + `<div class="cb-cel">${pilulaCel(x.cel, `data-cli="${p}"`, "Abrir a conversa com o cliente no WhatsApp")}</div>`
+      + `<div class="cb-cel">${pilulaCel(x.cel, `data-cli="${p}"`, "Abrir a conversa com o cliente no WhatsApp")}${lapisCel(`data-lapis="${p}"`)}</div>`   // 18/11 (E8b): + ✏️
       + `<div class="en-acoes">`
       + (espera ? `<div class="en-proc">⏳ processando…</div>` : "")
       // 15/11 (BOTOES_ETAPA): cada etapa só com os botões dela. 🕓 pendente: Enviar/Selecionar/🛵 Saiu (sem ✅).
@@ -1003,6 +1048,10 @@ function montarEntregas() {
     const rota = x => abrirRota({ nome: x.nome, end: x.end, reg: x.reg, cep: x.cep }, true);
     el.querySelectorAll("button.cb-rota[data-rota]").forEach(b => b.onclick = () => rota(achar(b.dataset.rota)));
     el.querySelectorAll("button.cb-num[data-cli]").forEach(b => b.onclick = () => abrirCliente(achar(b.dataset.cli)));
+    el.querySelectorAll("button.cel-lapis[data-lapis]").forEach(b => b.onclick = () => {   // 18/11 (E8b): grava só o número
+      const x = achar(b.dataset.lapis);
+      folhaCel(x.cli, x.nome, x.cel, d => { lista.forEach(o => { if (o.cli === x.cli) o.cel = d; }); mostrar(); });
+    });
     el.querySelectorAll("[data-a]").forEach(b => b.onclick = () => {
       const x = achar(b.dataset.p), a = b.dataset.a;
       if (a === "zap") mandarAoEntregador(x); else if (a === "sel") selecionarEntregador(x); else status(x, a, b);
