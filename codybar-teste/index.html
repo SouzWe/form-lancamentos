@@ -495,6 +495,14 @@ function folhaCel(id, nome, atual, depois) {
     mandarBot(`📱 WHATSAPP ${id}: ${d}`);
   }, fechar, t => { fundo.querySelector("#fc_erro").textContent = t; });
 }
+// 18/11 (E8c): valor digitado em reais, lido a cada tecla (🗺️ Cobranças e folha do ✅ Entregue).
+// Aceita "430", "430,", "430,5", "430,50", "430.50", "1.234,56", "1.234" e "R$ 430,00". Inválido = NaN.
+function lerValorBR(s) {
+  s = String(s || "").trim().replace(/^R\$\s*/i, "").replace(/\s/g, ""); if (!s) return NaN;
+  if (s.includes(",")) s = s.replace(/\./g, "").replace(",", ".");          // vírgula = decimal; ponto = milhar
+  else if (/^\d{1,3}(\.\d{3})+$/.test(s)) s = s.replace(/\./g, "");       // "1.234" = mil duzentos e trinta e quatro
+  return /^\d+(\.\d{0,2})?$/.test(s) ? Number(s.replace(/\.$/, "")) : NaN;
+}
 function abrirRecibo(cel, texto) {
   let d = digitosNumero(cel); if (d.length > 11 && d.startsWith("55")) d = d.slice(2);
   if (d) abrirLink(`https://wa.me/55${d}?text=${encodeURIComponent(texto)}`);
@@ -583,8 +591,7 @@ function montarCobrancas() {
   const FORMAS = [["dinheiro", "💵 Dinheiro"], ["pix", "⚡ Pix"], ["cartão", "💳 Cartão"]];
   const HORAS = []; for (let m = 8 * 60; m <= 20 * 60; m += 30) HORAS.push(String(Math.floor(m / 60)).padStart(2, "0") + ":" + String(m % 60).padStart(2, "0"));
   const virgula = n => Number(n).toFixed(2).replace(".", ",");
-  const lerValor = s => { s = String(s || "").trim().replace(/^R\$\s*/i, ""); if (!s) return NaN;
-    if (s.includes(",")) s = s.replace(/\./g, "").replace(",", "."); return /^\d+(\.\d{1,2})?$/.test(s) ? Number(s) : NaN; };
+  const lerValor = lerValorBR;   // 18/11 (E8c): aceita o valor enquanto digita ("430," = 430)
   function pagamento(x) {
     if (!x || toqueCob(x.id)) return;
     const cod = String(x.id).replace(/\D/g, "").slice(-4);
@@ -835,8 +842,7 @@ function montarEntregas() {
   const MOTIVOS = ["vai pagar depois", "sem dinheiro agora", "pix/cartão não passou", "outro"];
   const FORMAS = [["dinheiro", "💵 Dinheiro"], ["pix", "⚡ Pix"], ["cartão", "💳 Cartão"]];
   const virgula = n => Number(n).toFixed(2).replace(".", ",");
-  const lerValor = s => { s = String(s || "").trim().replace(/^R\$\s*/i, ""); if (!s) return NaN;
-    if (s.includes(",")) s = s.replace(/\./g, "").replace(",", "."); return /^\d+(\.\d{1,2})?$/.test(s) ? Number(s) : NaN; };
+  const lerValor = lerValorBR;   // 18/11 (E8c): aceita o valor enquanto digita ("430," = 430)
   // (a página de Entregas não carrega os helpers dos formulários: hoje e horários locais)
   const hojeLocal = () => { const d = new Date(); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); return d.toISOString().slice(0, 10); };
   const HORAS_PG = []; for (let m = 8 * 60; m <= 20 * 60; m += 30) HORAS_PG.push(String(Math.floor(m / 60)).padStart(2, "0") + ":" + String(m % 60).padStart(2, "0"));
