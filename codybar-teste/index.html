@@ -201,6 +201,10 @@
   .en-item .en-junto { font-size: 13px; color: var(--fixo); }
   .en-item.pend .en-junto { color: #b26b00; }
   .en-valor { color: var(--ok); }
+  /* 18/11 (E7b): pílula do WhatsApp do cliente na última linha do bloco de valores ("· cobrança 28/11" à esquerda) */
+  .en-item .en-deve > div.en-ult { display: flex; justify-content: space-between; align-items: center; gap: 8px; overflow: visible; }
+  .en-ult .en-ult-txt { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+  .en-ult .cb-num { flex: none; padding: 7px 14px; }
   .en-acoes { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 10px; }
   .en-acoes button { padding: 10px 4px; border: 1px solid transparent; border-radius: 10px; background: var(--campo);
                      color: var(--txt); font: inherit; font-size: 13px; cursor: pointer; }
@@ -850,7 +854,9 @@ function montarEntregas() {
     return `<div class="situacao en-deve"><div class="rot">Deve no total</div><div class="total">💸 <b>${reais(d.total)}</b></div>`
       + `<div class="rot">Débitos em aberto:</div><div class="deve">🛒 ${d.aberto > 0 ? `<b>${reais(d.aberto)}</b>` : `<span class="en-vazio">—</span>`}</div>`
       + `<div class="rot">Débito anterior:</div><div class="deve">📒 (talão): ${d.talao > 0 ? `<b>${reais(d.talao)}</b>` : `<span class="en-vazio">—</span>`}</div>`
-      + `<div class="deve">${d.talao > 0 && dataTalao ? dataTalao : `<span class="en-vazio">&nbsp;</span>`}</div>`
+      // 18/11 (E7b): mesma linha = "· cobrança DD/MM" à esquerda + pílula do WhatsApp do cliente à direita (linha sempre presente)
+      + `<div class="deve en-ult"><span class="en-ult-txt">${d.talao > 0 && dataTalao ? dataTalao : `<span class="en-vazio">&nbsp;</span>`}</span>`
+      + `${pilulaCel(x.cel, `data-cli="${esc(x.ped)}"`, "Abrir a conversa com o cliente no WhatsApp")}</div>`
       + `</div>`;
   }
   // 17/11 (E6 etapa B): cliente com 2+ pedidos abertos (pendente ou saiu) → "📦 N pedidos deste cliente"
@@ -900,8 +906,7 @@ function montarEntregas() {
           + `<button type="button" class="en-sel" data-a="sel" data-p="${p}">👤 Selecionar entregador</button>`
           + `<button type="button" class="en-full" data-a="saiu" data-p="${p}"${off}>🛵 Saiu</button>`)
       + `</div>`
-      + `<div class="cb-cel">${pilulaCel(x.cel, `data-cli="${p}"`, "Abrir a conversa com o cliente no WhatsApp")}</div>`
-      + `</div>`;
+      + `</div>`;   // 18/11 (E7b): a pílula do cliente subiu para a linha da cobrança (blocoDeve)
   };
   let reMostrar = null, aba = "";
   function mostrar() {
