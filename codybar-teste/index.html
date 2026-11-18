@@ -240,6 +240,20 @@
   .pg-op.tres { grid-template-columns: 1fr 1fr 1fr; }
   .pg-op.tres button { font-size: 14px; padding: 12px 4px; }
   .pg-recibo { text-align: center; margin-top: 14px; }
+  /* 18/11 (E8): conta na hora do "Pagou uma parte" + ✏️ WhatsApp do cliente no modal */
+  .pg-conta { margin-top: 10px; padding: 10px 12px; border-radius: 12px; background: var(--campo); font-size: 15px; }
+  .pg-conta div { display: flex; justify-content: space-between; gap: 10px; padding: 2px 0; }
+  .pg-conta b { font-variant-numeric: tabular-nums; }
+  .pg-conta .falta b { color: var(--erro); }
+  .pg-conta .maior { color: var(--erro); font-weight: 600; justify-content: center; padding-top: 6px; }
+  .pg-ok:disabled { opacity: .45; cursor: not-allowed; }
+  button.cb-num.sem-num { cursor: pointer; font: inherit; }
+  .pg-cel { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: center; margin-top: 10px; text-align: left; }
+  .pg-cel label { width: 100%; margin: 0; }
+  .pg-cel input { flex: 1; min-width: 150px; }
+  .pg-cel button { border: 0; border-radius: 10px; padding: 10px 14px; font: 600 14px/1.2 inherit; cursor: pointer; }
+  .pg-cel .salvar { background: var(--btn); color: var(--btn-txt); }
+  .pg-cel .fechar { background: var(--campo); color: var(--txt); }
   .pg-proc { text-align: center; font-size: 14px; color: var(--dica); padding: 14px 0 4px; }
   .pg-ok { width: 100%; margin-top: 14px; padding: 13px; border: 0; border-radius: 12px; background: var(--btn);
     color: var(--btn-txt); font: 600 16px/1.2 inherit; cursor: pointer; }
@@ -448,6 +462,15 @@ function montarCobrancas() {
       : d.length === 10 ? `(${d.slice(0, 2)}) ${d.slice(2, 6)}-${d.slice(6)}` : d;
   };
   // Data da cobrança = a mais próxima entre venda e talão; vencida tem prioridade (a mais antiga)
+  // 18/11 (E8): número salvo pelo ✏️ do modal (o link só traz o número novo depois que os botões forem reenviados)
+  function celSalvo(id) {
+    try { const m = JSON.parse(localStorage.getItem("cb_cel_salvo") || "{}") || {}, r = m[id];
+      return r && Date.now() - r.t < 30 * 864e5 ? r.cel : ""; } catch (e) { return ""; }
+  }
+  function guardarCel(id, cel) {
+    try { const m = JSON.parse(localStorage.getItem("cb_cel_salvo") || "{}") || {}; m[id] = { cel, t: Date.now() };
+      localStorage.setItem("cb_cel_salvo", JSON.stringify(m)); } catch (e) {}
+  }
   const devedores = CLIENTES.map(c => {
     const talao = Number(c[4]) || 0, aberto = Number(c[5]) || 0, total = Math.round((talao + aberto) * 100) / 100;
     const ds = [];
@@ -456,7 +479,7 @@ function montarCobrancas() {
     const venc = ds.filter(x => x.venc).sort((a, b) => a.d.localeCompare(b.d));
     const outras = ds.filter(x => !x.venc).sort((a, b) => a.d.localeCompare(b.d));
     const cob = venc[0] || outras[0] || null;
-    return { id: c[0], nome: c[1], reg: c[2] || SEM_REG, cel: c[3], talao, aberto, total, cob, ordem: cob ? (cob.venc ? 0 : 1) : 2,
+    return { id: c[0], nome: c[1], reg: c[2] || SEM_REG, cel: c[3] || celSalvo(c[0]), talao, aberto, total, cob, ordem: cob ? (cob.venc ? 0 : 1) : 2,
              end: String(c[12] || "").trim(), cep: String(c[13] || "").replace(/\D/g, "") };   // 13/11: 13º/14º = endereço, CEP
   }).filter(x => x.total > 0.004);   // só quem deve (talão + vendas em aberto)
   const regioes = [...BAIRROS];
@@ -528,19 +551,64 @@ function montarCobrancas() {
       <div class="pg-op tres"><button type="button" data-op="tudo">✅ Pagou tudo</button><button type="button" data-op="parte">💵 Pagou uma parte</button><button type="button" data-op="nao">⏳ Não pagou</button></div>
       <div id="pg_rec" hidden><label for="pg_valor">Valor recebido *</label>
         <input id="pg_valor" type="text" inputmode="decimal" value="${virgula(x.total)}">
+        <div class="pg-conta" id="pg_conta" hidden></div>
         <label>Forma *</label><div class="pg-chips" data-g="forma">${FORMAS.map(([v, r]) => `<button type="button" data-v="${esc(v)}">${esc(r)}</button>`).join("")}</div></div>
       <div id="pg_falta" hidden><div class="dupla"><div><label for="pg_data">📆 Próxima cobrança *</label><input id="pg_data" type="date" min="${hoje}"></div>
         <div><label for="pg_hora">Horário</label><select id="pg_hora"><option value="">— (sem horário)</option>${HORAS.map(h => `<option>${h}</option>`).join("")}</select></div></div></div>
       <div id="pg_obs_caixa" hidden><label for="pg_obs">📝 Observação (opcional)</label>
         <textarea id="pg_obs" maxlength="200" placeholder="ex.: pagou na feira"></textarea></div>
       <div class="pg-erro" id="pg_erro"></div>
-      <div class="pg-recibo" id="pg_recibo" hidden>${pilulaRecibo(x.cel)}</div>
+      <div class="pg-recibo" id="pg_recibo" hidden></div>
       <div id="pg_botoes"><button type="button" class="pg-ok" id="pg_ok" hidden>✅ Confirmar</button>
       <button type="button" class="cb-cancelar" data-cancelar="1">✕ Cancelar</button></div></div>`;
     const $f = s => fundo.querySelector(s);
-    let op = "", forma = "", enviado = false;
-    const fechar = () => { if (!enviado) fundo.remove(); };
+    let op = "", forma = "", enviado = false, celNovo = "";
+    // 18/11 (E8): número salvo pelo ✏️ e ainda não mandado vai ao bot mesmo se fechar sem confirmar o pagamento
+    const fechar = () => { if (enviado) return;
+      if (celNovo) { enviado = true; const txt = `📱 WHATSAPP ${x.id}: ${celNovo}`;
+        if (tg && tg.platform && tg.platform !== "unknown") { tg.sendData(txt); return; }
+        $("#saida").hidden = false; $("#saida").textContent = txt; }
+      fundo.remove(); };
     const erro = t => { $f("#pg_erro").textContent = t; };
+    // 18/11 (E8): "Pagou uma parte" — Deve / Recebido / Falta a cada número digitado (só na tela, não grava)
+    const conta = () => {
+      const c = $f("#pg_conta"), ok = $f("#pg_ok");
+      if (op !== "parte") { c.hidden = true; ok.disabled = false; return; }
+      const v = lerValor($f("#pg_valor").value), rec = v > 0 ? v : 0, maior = rec > x.total + 0.005;
+      c.hidden = false; ok.disabled = maior;
+      c.innerHTML = `<div><span>Deve:</span><b>${reais(x.total)}</b></div><div><span>Recebido:</span><b>${reais(rec)}</b></div>`
+        + (maior ? `<div class="maior">⚠️ maior que a dívida</div>`
+                 : `<div class="falta"><span>Falta:</span><b>${reais(Math.round((x.total - rec) * 100) / 100)}</b></div>`);
+    };
+    // 18/11 (E8): pílula do recibo; sem número = "⚠️ ✖ sem número ✏️" (toque abre o campo do WhatsApp)
+    const mostraCel = d => `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`;
+    const recibo = () => {
+      const r = $f("#pg_recibo"), d = digitosNumero(x.cel);
+      r.innerHTML = celNovo ? `<button type="button" class="cb-num ok" data-recibo="1">💬 ${mostraCel(d)} ›</button>`
+        : !d || erroNumeroCel(x.cel) ? `<button type="button" class="cb-num fixo sem-num" data-editcel="1">⚠️ ✖ sem número ✏️</button>`
+        : pilulaRecibo(x.cel);
+      const rb = r.querySelector("[data-recibo]");
+      if (rb) rb.onclick = () => { const v = validar(); if (v) abrirRecibo(x.cel, reciboTexto(x.nome, v.rec, forma, v.falta, v.dIso, v.hora)); };
+      const eb = r.querySelector("[data-editcel]");
+      if (eb) eb.onclick = editarCel;
+    };
+    function editarCel() {
+      const r = $f("#pg_recibo");
+      r.innerHTML = `<div class="pg-cel"><label for="pg_cel">📱 WhatsApp do cliente</label>
+        <input id="pg_cel" type="tel" inputmode="numeric" maxlength="15" placeholder="(__) _____-____" autocomplete="off">
+        <button type="button" class="salvar">Salvar</button><button type="button" class="fechar" aria-label="Fechar">✕</button></div>`;
+      const inp = r.querySelector("#pg_cel");
+      inp.oninput = () => { const d = inp.value.replace(/\D/g, "").slice(0, 11);
+        inp.value = d.length > 7 ? `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}` : d.length > 2 ? `(${d.slice(0, 2)}) ${d.slice(2)}` : d; erro(""); };
+      r.querySelector(".fechar").onclick = () => { erro(""); recibo(); };
+      r.querySelector(".salvar").onclick = () => {
+        const d = digitosNumero(inp.value);
+        if (d.length !== 11) { erro(erroNumeroCel(d) || "Coloque o WhatsApp com DDD: (00) 90000-0000."); inp.focus(); return; }
+        const e = erroNumeroCel(d); if (e) { erro(e); inp.focus(); return; }
+        celNovo = d; x.cel = d; guardarCel(x.id, d); erro(""); recibo();
+      };
+      inp.focus();
+    }
     const atualizar = () => {
       fundo.querySelectorAll("[data-op]").forEach(b => b.classList.toggle("on", b.dataset.op === op));
       $f("#pg_rec").hidden = !(op === "tudo" || op === "parte");
@@ -549,6 +617,7 @@ function montarCobrancas() {
       $f("#pg_falta").hidden = !(op === "parte" || op === "nao");
       $f("#pg_obs_caixa").hidden = $f("#pg_ok").hidden = $f("#pg_recibo").hidden = !op;
       fundo.querySelectorAll("input[type=date], select").forEach(el => el.classList.toggle("vazio", !el.value));
+      conta();
     };
     // confere tudo; devolve o pagamento ou null (com a frase do erro)
     const validar = () => {
@@ -574,15 +643,15 @@ function montarCobrancas() {
       if (op === "parte") { $f("#pg_valor").value = ""; atualizar(); $f("#pg_valor").focus(); } else atualizar(); });
     fundo.querySelectorAll(".pg-chips button").forEach(b => b.onclick = () => {
       fundo.querySelectorAll(".pg-chips button").forEach(o => o.classList.toggle("on", o === b)); forma = b.dataset.v; erro(""); });
-    $f("#pg_valor").oninput = () => erro("");
+    $f("#pg_valor").oninput = () => { erro(""); conta(); };
     $f("#pg_data").onchange = $f("#pg_hora").onchange = () => { erro(""); atualizar(); };
-    const rb = $f("[data-recibo]");
-    if (rb) rb.onclick = () => { const v = validar(); if (v) abrirRecibo(x.cel, reciboTexto(x.nome, v.rec, forma, v.falta, v.dIso, v.hora)); };
+    recibo();
     $f("#pg_ok").onclick = () => {
       const v = validar(); if (!v) return;
       const partes = [`💰 PAGAMENTO ${x.id}: recebeu ${virgula(v.rec)}${v.rec > 0 ? " no " + forma : ""}`];
       if (v.falta > 0.005) partes.push(`cobrança: ${v.dIso.split("-").reverse().join("/")}${v.hora ? " " + v.hora : ""}`);
       if (v.obs) partes.push(`obs: ${v.obs}`);
+      if (celNovo) partes.push(`whatsapp: ${celNovo}`);   // 18/11 (E8): grava o número junto (pagamento --celular)
       enviado = true; guardarCob(x.id);
       $f("#pg_botoes").innerHTML = `<div class="pg-proc">⏳ processando…</div>`;   // botão some (igual às Entregas)
       const txt = partes.join(" · ");
