@@ -201,10 +201,6 @@
   .en-item .en-junto { font-size: 13px; color: var(--fixo); }
   .en-item.pend .en-junto { color: #b26b00; }
   .en-valor { color: var(--ok); }
-  /* 18/11 (E7b): pílula do WhatsApp do cliente na última linha do bloco de valores ("· cobrança 28/11" à esquerda) */
-  .en-item .en-deve > div.en-ult { display: flex; justify-content: space-between; align-items: center; gap: 8px; overflow: visible; }
-  .en-ult .en-ult-txt { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
-  .en-ult .cb-num { flex: none; padding: 7px 14px; }
   .en-acoes { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 10px; }
   .en-acoes button { padding: 10px 4px; border: 1px solid transparent; border-radius: 10px; background: var(--campo);
                      color: var(--txt); font: inherit; font-size: 13px; cursor: pointer; }
@@ -259,6 +255,17 @@
   .en-canto { position: absolute; top: 12px; right: 16px; display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
   .en-item .en-canto .cb-rota { position: static; }
   .en-item .cb-nome, .en-item .en-ped { padding-right: 132px; }
+  /* 18/11 (E6c): novo topo do card — linha 1 nome + 💬 cliente; linha 2 pedido · data hora + 🗺️; linha 3 etiqueta + status.
+     Parte de cima fixa; área dos botões só com a altura dos botões que existem (sem buraco). */
+  .en-topo1, .en-topo2 { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+  .en-item .en-topo1 .cb-nome { padding-right: 0; flex: 1; min-width: 0; }
+  .en-topo1 .cb-num { flex: none; padding: 5px 12px; }
+  .en-item .en-topo2 { margin-top: 4px; }
+  .en-item .en-topo2 .en-ped { margin-top: 0; padding-right: 0; flex: 1; min-width: 0; }
+  .en-item .en-topo2 .cb-rota { position: static; flex: none; padding: 2px 4px; }
+  .en-topo3 { display: flex; gap: 8px; align-items: center; margin-top: 12px; }
+  .en-item .en-topo3 .en-eu { margin-left: 0; padding: 3px 10px; font-size: 12px; }
+  .en-item .en-acoes { min-height: 0; }
   .en-chip { display: inline-block; padding: 3px 10px; border-radius: 999px; font-size: 12px; font-weight: 600; white-space: nowrap; }
   .en-item.pend .en-chip { background: #eef0f3; color: #44464d; border: 1px solid #cfd1d7; }
   .en-item.saiu .en-chip { background: color-mix(in srgb, var(--fixo) 18%, transparent); color: var(--fixo);
@@ -854,9 +861,7 @@ function montarEntregas() {
     return `<div class="situacao en-deve"><div class="rot">Deve no total</div><div class="total">💸 <b>${reais(d.total)}</b></div>`
       + `<div class="rot">Débitos em aberto:</div><div class="deve">🛒 ${d.aberto > 0 ? `<b>${reais(d.aberto)}</b>` : `<span class="en-vazio">—</span>`}</div>`
       + `<div class="rot">Débito anterior:</div><div class="deve">📒 (talão): ${d.talao > 0 ? `<b>${reais(d.talao)}</b>` : `<span class="en-vazio">—</span>`}</div>`
-      // 18/11 (E7b): mesma linha = "· cobrança DD/MM" à esquerda + pílula do WhatsApp do cliente à direita (linha sempre presente)
-      + `<div class="deve en-ult"><span class="en-ult-txt">${d.talao > 0 && dataTalao ? dataTalao : `<span class="en-vazio">&nbsp;</span>`}</span>`
-      + `${pilulaCel(x.cel, `data-cli="${esc(x.ped)}"`, "Abrir a conversa com o cliente no WhatsApp")}</div>`
+      + `<div class="deve">${d.talao > 0 && dataTalao ? dataTalao : `<span class="en-vazio">&nbsp;</span>`}</div>`
       + `</div>`;
   }
   // 17/11 (E6 etapa B): cliente com 2+ pedidos abertos (pendente ou saiu) → "📦 N pedidos deste cliente"
@@ -879,13 +884,13 @@ function montarEntregas() {
       : `<span class="cb-rota off" aria-label="Sem endereço">🗺️</span>`;
     const st = x.saiu ? "🛵 saiu" : "🕓 pendente";   // 17/11 (E6b): chip curto; a hora da saída vai embaixo do pedido   // 17/11 (E5c): hora da venda saiu do chip, vai embaixo do pedido
     const espera = toqueRecente(x) > 0, off = "";
-    return `<div class="en-item ${x.saiu ? "saiu" : "pend"}"><div class="en-canto"><span class="en-chip">${st}</span>${rota}</div>`
-      + `<div class="cb-nome">${esc(nomeCod(x.nome, cod))}</div>`
-      // 17/11 (E5c): etiqueta = nome do entregador escolhido (sem entregador = 🛵 Motoboy); data e hora da venda na linha de baixo
-      // 17/11 (E6): linha do pedido só com o número; embaixo "DD/MM HH:MM · etiqueta" (etiqueta inteira)
-      + `<div class="en-ped">${p}</div>`
-      // 17/11 (E6b): um horário por card — pendente = hora da venda; saiu = "DD/MM HH:MM" da saída (sem a palavra "saiu": o chip já diz)
-      + `<div class="en-ped en-data">${x.saiu ? (x.saida ? esc(x.saida) : `<span class="en-vazio">—</span>`) : x.hora ? esc(x.hora) : `<span class="en-vazio">—</span>`}  ·  <span class="en-eu">${x.eu ? "🙋 Eu entrego" : "🛵 " + esc(ent ? nomeEnt(ent) : "Motoboy")}</span></div>`
+    // 18/11 (E6c): topo novo. Linha 1 = nome + 💬 do cliente; linha 2 = pedido · data hora (saiu = hora da saída, E6b) + 🗺️;
+    // linha 3 = etiqueta (🛵 entregador / 🛵 Motoboy / 🙋 Eu entrego) + status (🕓 pendente / 🛵 saiu)
+    const quando = x.saiu ? (x.saida ? esc(x.saida) : `<span class="en-vazio">—</span>`) : x.hora ? esc(x.hora) : `<span class="en-vazio">—</span>`;
+    return `<div class="en-item ${x.saiu ? "saiu" : "pend"}">`
+      + `<div class="en-topo1"><div class="cb-nome">${esc(nomeCod(x.nome, cod))}</div>${pilulaCel(x.cel, `data-cli="${p}"`, "Abrir a conversa com o cliente no WhatsApp")}</div>`
+      + `<div class="en-topo2"><div class="en-ped">${p} · ${quando}</div>${rota}</div>`
+      + `<div class="en-topo3"><span class="en-eu">${x.eu ? "🙋 Eu entrego" : "🛵 " + esc(ent ? nomeEnt(ent) : "Motoboy")}</span><span class="en-chip">${st}</span></div>`
       // 17/11 (E5b): endereço em 2 linhas (bairro em cima, rua embaixo), sem rótulos; "—" se faltar
       + `<div class="en-end"><div class="cb-li">${x.reg ? esc(x.reg) : `<span class="en-vazio">sem região</span>`}</div>`
       + `<div class="cb-li">${x.end ? esc(x.end) : `<span class="en-vazio">—</span>`}</div></div>`
@@ -906,7 +911,7 @@ function montarEntregas() {
           + `<button type="button" class="en-sel" data-a="sel" data-p="${p}">👤 Selecionar entregador</button>`
           + `<button type="button" class="en-full" data-a="saiu" data-p="${p}"${off}>🛵 Saiu</button>`)
       + `</div>`
-      + `</div>`;   // 18/11 (E7b): a pílula do cliente subiu para a linha da cobrança (blocoDeve)
+      + `</div>`;   // 18/11 (E6c): a 💬 do cliente subiu para o topo
   };
   let reMostrar = null, aba = "";
   function mostrar() {
