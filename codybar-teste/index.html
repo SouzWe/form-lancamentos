@@ -899,6 +899,8 @@ function montarEntregas() {
       + `<div class="cb-li">🚚 Frete${x.reg && x.frete ? " (" + esc(x.reg) + ")" : ""}: ${x.frete ? reais(x.frete) : `<span class="en-vazio">—</span>`}</div>`
       + `<div class="cb-li en-junto">${junto(x) || "&nbsp;"}</div>`   // 17/11 (E6): 📦 2+ pedidos do mesmo cliente
       + blocoDeve(x)
+      // 18/11 (E6e): 💬 do cliente à direita, logo ACIMA dos botões (🛵 Saiu…)
+      + `<div class="cb-cel">${pilulaCel(x.cel, `data-cli="${p}"`, "Abrir a conversa com o cliente no WhatsApp")}</div>`
       + `<div class="en-acoes">`
       + (espera ? `<div class="en-proc">⏳ processando…</div>` : "")
       // 15/11 (BOTOES_ETAPA): cada etapa só com os botões dela. 🕓 pendente: Enviar/Selecionar/🛵 Saiu (sem ✅).
@@ -911,7 +913,6 @@ function montarEntregas() {
           + `<button type="button" class="en-sel" data-a="sel" data-p="${p}">👤 Selecionar entregador</button>`
           + `<button type="button" class="en-full" data-a="saiu" data-p="${p}"${off}>🛵 Saiu</button>`)
       + `</div>`
-      + `<div class="cb-cel">${pilulaCel(x.cel, `data-cli="${p}"`, "Abrir a conversa com o cliente no WhatsApp")}</div>`   // 18/11 (E6d): 💬 no canto inferior direito
       + `</div>`;
   };
   let reMostrar = null, aba = "";
