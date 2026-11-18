@@ -234,6 +234,13 @@
   .pg-op button.on, .pg-chips button.on { background: var(--btn); color: var(--btn-txt); font-weight: 600; }
   .pg-erro { color: var(--erro); font-size: 14px; font-weight: 600; margin-top: 10px; }
   .pg-erro:empty { display: none; }
+  /* 17/11 (E7): 🗺️ Cobranças com pagamento — card tocável, modal com 3 opções, recibo no WhatsApp, ⏳ processando */
+  .cb-item.cb-toca { cursor: pointer; }
+  .cb-anotar { font-size: 13px; color: var(--dica); margin-top: 6px; }
+  .pg-op.tres { grid-template-columns: 1fr 1fr 1fr; }
+  .pg-op.tres button { font-size: 14px; padding: 12px 4px; }
+  .pg-recibo { text-align: center; margin-top: 14px; }
+  .pg-proc { text-align: center; font-size: 14px; color: var(--dica); padding: 14px 0 4px; }
   .pg-ok { width: 100%; margin-top: 14px; padding: 13px; border: 0; border-radius: 12px; background: var(--btn);
     color: var(--btn-txt); font: 600 16px/1.2 inherit; cursor: pointer; }
   .en-item.pend { background: var(--bg); border-top: 1px solid color-mix(in srgb, var(--txt) 25%, transparent);
@@ -391,6 +398,29 @@ function pilulaCel(v, attrs, rotulo) {
   return `<button type="button" class="cb-num ${fixo ? "fixo" : "ok"}" ${attrs} aria-label="${esc(rotulo)}">${fixo ? "☎️" : "💬"} ${esc(fmt)} ›</button>`;
 }
 
+// 17/11 (E7): recibo pronto para o WhatsApp do cliente — o Wellington é quem envia (o bot não manda nada).
+// rec = recebido agora; falta = o que continua devendo; dIso/hora = próxima cobrança; ped = pedido (folha do ✅ Entregue).
+function reciboTexto(nome, rec, forma, falta, dIso, hora, ped) {
+  const rs = n => "R$ " + Number(n).toFixed(2).replace(".", ",").replace(/\B(?=(\d{3})+,)/g, ".");
+  const dm = iso => iso ? iso.slice(8, 10) + "/" + iso.slice(5, 7) : "";
+  const d = new Date(), hojeDM = String(d.getDate()).padStart(2, "0") + "/" + String(d.getMonth() + 1).padStart(2, "0");
+  const n = String(nome || "").trim().split(/\s+/)[0];
+  const prox = `${dm(dIso)}${hora ? " às " + hora : ""}`;
+  if (!(rec > 0)) return `Olá, ${n}! Combinado: o pagamento de ${rs(falta)}${ped ? ` (pedido ${ped})` : ""} fica para ${prox}. Obrigado! 😊`;
+  return `Olá, ${n}! Recebemos ${rs(rec)} no ${forma} em ${hojeDM}${ped ? ` (pedido ${ped})` : ""}.`
+    + (falta > 0.005 ? ` Restante: ${rs(falta)}, próxima cobrança ${prox}.` : " Tudo quitado. Obrigado! 😊");
+}
+// pílula verde "💬 Recibo no WhatsApp" (mesmo estilo do número); sem celular válido = desligada "✖ sem número"
+function pilulaRecibo(cel) {
+  const d = digitosNumero(cel);
+  if (!d || erroNumeroCel(cel)) return `<span class="cb-num fixo">⚠️ ✖ sem número</span>`;
+  return `<button type="button" class="cb-num ok" data-recibo="1">💬 Recibo no WhatsApp ›</button>`;
+}
+function abrirRecibo(cel, texto) {
+  let d = digitosNumero(cel); if (d.length > 11 && d.startsWith("55")) d = d.slice(2);
+  if (d) abrirLink(`https://wa.me/55${d}?text=${encodeURIComponent(texto)}`);
+}
+
 function montarCobrancas() {
   const esc = t => String(t).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
   const reais = n => "R$ " + n.toFixed(2).replace(".", ",").replace(/\B(?=(\d{3})+,)/g, ".");
@@ -433,10 +463,13 @@ function montarCobrancas() {
     const rota = x.end || x.cep
       ? `<button type="button" class="cb-rota" data-rota="${esc(x.id)}" aria-label="Rota até o cliente">🗺️</button>`
       : `<span class="cb-rota off" aria-label="Sem endereço">🗺️</span>`;
-    return `<div class="cb-item">${rota}<div class="cb-nome">${esc(nomeCod(x.nome, cod))}</div>`
+    // 17/11 (E7): tocar no card abre o 💰 pagamento; logo depois de confirmar fica "⏳ processando…" (60 s)
+    const proc = toqueCob(x.id) > 0;
+    return `<div class="cb-item cb-toca" data-pg="${esc(x.id)}">${rota}<div class="cb-nome">${esc(nomeCod(x.nome, cod))}</div>`
       + `<div class="cb-li">💸 ${reais(x.total)}</div>` + quando
       + (x.aberto > 0 ? `<div class="cb-li">🛒 Débitos em aberto: ${reais(x.aberto)}</div>` : "")
       + (x.talao > 0 ? `<div class="cb-li">📒 Talão: ${reais(x.talao)}</div>` : "")
+      + (proc ? `<div class="cb-anotar">⏳ processando…</div>` : `<div class="cb-anotar">💰 Toque para anotar pagamento</div>`)
       + `<div class="cb-cel">${pilula(x)}</div></div>`;
   };
   const ordenar = l => l.sort((a, b) => a.ordem - b.ordem || (a.cob && b.cob ? a.cob.d.localeCompare(b.cob.d) : 0) || sem(a.nome).localeCompare(sem(b.nome)));
@@ -455,9 +488,106 @@ function montarCobrancas() {
       : `Olá, ${nome}! Passando para lembrar da cobrança de ${reais(x.total)}, combinada para ${ddmm(x.cob.d)}.${fim}`;
     abrirLink(`https://wa.me/55${d}?text=${encodeURIComponent(msg)}`);
   }
+  // 17/11 (E7): lembra o último pagamento confirmado por 60 s neste aparelho (a página fecha ao gravar)
+  const TOQUE_COB = "cb_toque_cob", TOQUE_MS = 60000;
+  function toqueCob(id) {
+    try { const m = JSON.parse(localStorage.getItem(TOQUE_COB) || "{}") || {}; const f = TOQUE_MS - (Date.now() - (m[id] || 0));
+      return f > 0 && f <= TOQUE_MS ? f : 0; } catch (e) { return 0; }
+  }
+  function guardarCob(id) {
+    try { const m = JSON.parse(localStorage.getItem(TOQUE_COB) || "{}") || {}, ag = Date.now();
+      for (const k in m) if (!(ag - m[k] < TOQUE_MS)) delete m[k];
+      m[id] = ag; localStorage.setItem(TOQUE_COB, JSON.stringify(m)); } catch (e) {}
+  }
+  // 💰 modal do pagamento (mesmo jeito da folha 💰 Pagamento do ✅ Entregue). Ele é a confirmação: grava direto.
+  // Regra do motor (`pagamento`): abate primeiro o talão, depois as vendas da mais antiga para a mais nova.
+  const FORMAS = [["dinheiro", "💵 Dinheiro"], ["pix", "⚡ Pix"], ["cartão", "💳 Cartão"]];
+  const HORAS = []; for (let m = 8 * 60; m <= 20 * 60; m += 30) HORAS.push(String(Math.floor(m / 60)).padStart(2, "0") + ":" + String(m % 60).padStart(2, "0"));
+  const virgula = n => Number(n).toFixed(2).replace(".", ",");
+  const lerValor = s => { s = String(s || "").trim().replace(/^R\$\s*/i, ""); if (!s) return NaN;
+    if (s.includes(",")) s = s.replace(/\./g, "").replace(",", "."); return /^\d+(\.\d{1,2})?$/.test(s) ? Number(s) : NaN; };
+  function pagamento(x) {
+    if (!x || toqueCob(x.id)) return;
+    const cod = String(x.id).replace(/\D/g, "").slice(-4);
+    const fundo = document.createElement("div");
+    fundo.className = "cb-fundo";
+    fundo.innerHTML = `<div class="cb-folha pg-folha" role="dialog" aria-label="Pagamento">
+      <div class="cb-folha-topo"><b>💰 ${esc(nomeCod(x.nome, cod))} · deve ${reais(x.total)}</b><button type="button" class="cb-folha-x" aria-label="Fechar">✕</button></div>
+      <div class="pg-cobrar">${x.talao > 0 ? `📒 Talão: <b>${reais(x.talao)}</b>${x.aberto > 0 ? " · " : ""}` : ""}${x.aberto > 0 ? `🛒 Vendas: <b>${reais(x.aberto)}</b>` : ""}</div>
+      <div class="pg-op tres"><button type="button" data-op="tudo">✅ Pagou tudo</button><button type="button" data-op="parte">💵 Pagou uma parte</button><button type="button" data-op="nao">⏳ Não pagou</button></div>
+      <div id="pg_rec" hidden><label for="pg_valor">Valor recebido *</label>
+        <input id="pg_valor" type="text" inputmode="decimal" value="${virgula(x.total)}">
+        <label>Forma *</label><div class="pg-chips" data-g="forma">${FORMAS.map(([v, r]) => `<button type="button" data-v="${esc(v)}">${esc(r)}</button>`).join("")}</div></div>
+      <div id="pg_falta" hidden><div class="dupla"><div><label for="pg_data">📆 Próxima cobrança *</label><input id="pg_data" type="date" min="${hoje}"></div>
+        <div><label for="pg_hora">Horário</label><select id="pg_hora"><option value="">— (sem horário)</option>${HORAS.map(h => `<option>${h}</option>`).join("")}</select></div></div></div>
+      <div id="pg_obs_caixa" hidden><label for="pg_obs">📝 Observação (opcional)</label>
+        <textarea id="pg_obs" maxlength="200" placeholder="ex.: pagou na feira"></textarea></div>
+      <div class="pg-erro" id="pg_erro"></div>
+      <div class="pg-recibo" id="pg_recibo" hidden>${pilulaRecibo(x.cel)}</div>
+      <div id="pg_botoes"><button type="button" class="pg-ok" id="pg_ok" hidden>✅ Confirmar</button>
+      <button type="button" class="cb-cancelar" data-cancelar="1">✕ Cancelar</button></div></div>`;
+    const $f = s => fundo.querySelector(s);
+    let op = "", forma = "", enviado = false;
+    const fechar = () => { if (!enviado) fundo.remove(); };
+    const erro = t => { $f("#pg_erro").textContent = t; };
+    const atualizar = () => {
+      fundo.querySelectorAll("[data-op]").forEach(b => b.classList.toggle("on", b.dataset.op === op));
+      $f("#pg_rec").hidden = !(op === "tudo" || op === "parte");
+      $f("#pg_valor").disabled = op === "tudo";
+      if (op === "tudo") $f("#pg_valor").value = virgula(x.total);
+      $f("#pg_falta").hidden = !(op === "parte" || op === "nao");
+      $f("#pg_obs_caixa").hidden = $f("#pg_ok").hidden = $f("#pg_recibo").hidden = !op;
+      fundo.querySelectorAll("input[type=date], select").forEach(el => el.classList.toggle("vazio", !el.value));
+    };
+    // confere tudo; devolve o pagamento ou null (com a frase do erro)
+    const validar = () => {
+      if (!op) { erro("Escolha: pagou tudo, uma parte ou não pagou."); return null; }
+      const rec = op === "tudo" ? x.total : op === "parte" ? lerValor($f("#pg_valor").value) : 0;
+      if (op === "parte") {
+        if (!(rec > 0)) { erro("Informe o valor recebido (ou toque em ⏳ Não pagou)."); $f("#pg_valor").focus(); return null; }
+        if (rec > x.total - 0.005) { erro(rec > x.total + 0.005 ? `O valor passa do que deve (${reais(x.total)}).` : "É o total: toque em ✅ Pagou tudo."); return null; }
+      }
+      if (rec > 0 && !forma) { erro("Escolha a forma: dinheiro, pix ou cartão."); return null; }
+      const falta = Math.round((x.total - rec) * 100) / 100, dIso = $f("#pg_data").value, hora = $f("#pg_hora").value;
+      if (falta > 0.005) {
+        if (!dIso) { erro("Escolha a data da próxima cobrança."); $f("#pg_data").focus(); return null; }
+        if (dIso < hoje) { erro("A data da próxima cobrança já passou."); return null; }
+      }
+      return { rec, falta, dIso: falta > 0.005 ? dIso : "", hora: falta > 0.005 ? hora : "", obs: $f("#pg_obs").value.replace(/\s+/g, " ").trim() };
+    };
+    fundo.onclick = e => { if (e.target === fundo) fechar(); };
+    $f(".cb-folha-x").onclick = fechar;
+    $f("[data-cancelar]").onclick = fechar;
+    // "Pagou uma parte" abre com o valor vazio (o total é o "Pagou tudo")
+    fundo.querySelectorAll("[data-op]").forEach(b => b.onclick = () => { op = b.dataset.op; erro("");
+      if (op === "parte") { $f("#pg_valor").value = ""; atualizar(); $f("#pg_valor").focus(); } else atualizar(); });
+    fundo.querySelectorAll(".pg-chips button").forEach(b => b.onclick = () => {
+      fundo.querySelectorAll(".pg-chips button").forEach(o => o.classList.toggle("on", o === b)); forma = b.dataset.v; erro(""); });
+    $f("#pg_valor").oninput = () => erro("");
+    $f("#pg_data").onchange = $f("#pg_hora").onchange = () => { erro(""); atualizar(); };
+    const rb = $f("[data-recibo]");
+    if (rb) rb.onclick = () => { const v = validar(); if (v) abrirRecibo(x.cel, reciboTexto(x.nome, v.rec, forma, v.falta, v.dIso, v.hora)); };
+    $f("#pg_ok").onclick = () => {
+      const v = validar(); if (!v) return;
+      const partes = [`💰 PAGAMENTO ${x.id}: recebeu ${virgula(v.rec)}${v.rec > 0 ? " no " + forma : ""}`];
+      if (v.falta > 0.005) partes.push(`cobrança: ${v.dIso.split("-").reverse().join("/")}${v.hora ? " " + v.hora : ""}`);
+      if (v.obs) partes.push(`obs: ${v.obs}`);
+      enviado = true; guardarCob(x.id);
+      $f("#pg_botoes").innerHTML = `<div class="pg-proc">⏳ processando…</div>`;   // botão some (igual às Entregas)
+      const txt = partes.join(" · ");
+      if (tg && tg.platform && tg.platform !== "unknown") { tg.sendData(txt); return; }   // fecha a janela e manda ao bot
+      $("#saida").hidden = false; $("#saida").textContent = txt;                       // fora do Telegram: só mostra
+    };
+    document.body.appendChild(fundo);
+    atualizar();
+  }
   function mostrar() {
     const esc_ = $("#cb_regiao").value, el = $("#cb_lista"), q = sem($("#cb_busca").value.trim());
     setTimeout(() => {
+      el.querySelectorAll(".cb-item[data-pg]").forEach(c => c.onclick = e => {
+        if (e.target.closest("button, a")) return;   // 🗺️ e o número continuam com a função deles
+        pagamento(devedores.find(x => x.id === c.dataset.pg));
+      });
       el.querySelectorAll("button.cb-num[data-id]").forEach(b => b.onclick = () => cobrarWhatsApp(devedores.find(x => x.id === b.dataset.id)));
       el.querySelectorAll("button.cb-rota[data-rota]").forEach(b => b.onclick = () => {
         const x = devedores.find(x => x.id === b.dataset.rota);
@@ -475,7 +605,7 @@ function montarCobrancas() {
     el.innerHTML = grupos.map(([r, l]) => bloco(r, l)).join("") + `<div class="cb-total">Total geral: ${reais(soma(lista))}</div>`;
   }
   $("#titulo").textContent = "🗺️ Cobranças";
-  document.querySelector(".sub").textContent = "Só consulta: não grava nada e não manda nada ao bot.";
+  document.querySelector(".sub").textContent = "Toque no cliente para anotar o pagamento (grava direto).";   // 17/11 (E7)
   $("#enviar").remove();
   form.innerHTML = `<div class="cb-busca"><input id="cb_busca" type="search" placeholder="🔍 Buscar cliente pelo nome…" autocomplete="off"></div>`
     + `<label for="cb_regiao">Região</label><select id="cb_regiao"><option value="">Todas as regiões</option>`
@@ -613,6 +743,7 @@ function montarEntregas() {
       <div id="pg_obs_caixa" hidden><label for="pg_obs">📝 Observação (opcional)</label>
         <textarea id="pg_obs" maxlength="200" placeholder="ex.: cliente pediu pra passar sexta"></textarea></div>
       <div class="pg-erro" id="pg_erro"></div>
+      <div class="pg-recibo" id="pg_recibo" hidden>${pilulaRecibo(x.cel)}</div>
       <button type="button" class="pg-ok" id="pg_ok" hidden>✅ Confirmar entrega</button>
       <button type="button" class="cb-cancelar" data-cancelar="1">✕ Cancelar</button></div>`;
     const $f = s => fundo.querySelector(s);
@@ -625,7 +756,7 @@ function montarEntregas() {
       fundo.querySelectorAll("[data-op]").forEach(b => b.classList.toggle("on", b.dataset.op === op));
       $f("#pg_rec").hidden = op !== "sim";
       $f("#pg_falta").hidden = !(op === "nao" || (op === "sim" && v >= 0 && v < x.cobrar - 0.005));
-      $f("#pg_obs_caixa").hidden = $f("#pg_ok").hidden = !op;
+      $f("#pg_obs_caixa").hidden = $f("#pg_ok").hidden = $f("#pg_recibo").hidden = !op;   // 17/11 (E7): + recibo
       fundo.querySelectorAll('[data-date], input[type=date], select').forEach(el => el.classList.toggle("vazio", !el.value));
     };
     fundo.onclick = e => { if (e.target === fundo) fechar(); };
@@ -639,6 +770,16 @@ function montarEntregas() {
     }));
     $f("#pg_valor").oninput = () => { erro(""); atualizar(); };
     $f("#pg_data").onchange = $f("#pg_hora").onchange = () => { erro(""); atualizar(); };
+    // 17/11 (E7): 💬 Recibo no WhatsApp — mesma conferência do Confirmar, sem gravar nada
+    const rb = $f("[data-recibo]");
+    if (rb) rb.onclick = () => {
+      const rec = op === "sim" ? lerValor($f("#pg_valor").value) : 0;
+      if (op === "sim" && (!(rec > 0) || rec > x.cobrar + 0.005)) { erro("Informe o valor recebido certo antes do recibo."); return; }
+      if (rec > 0 && !forma) { erro("Escolha a forma: dinheiro, pix ou cartão."); return; }
+      const falta = Math.round((x.cobrar - rec) * 100) / 100, dIso = $f("#pg_data").value;
+      if (falta > 0.005 && !dIso) { erro("Escolha a nova data de cobrança antes do recibo."); return; }
+      abrirRecibo(x.cel, reciboTexto(x.nome, rec, forma, falta, dIso, $f("#pg_hora").value, x.ped));
+    };
     $f("#pg_ok").onclick = () => {
       const rec = op === "sim" ? lerValor($f("#pg_valor").value) : 0;
       if (op === "sim") {
