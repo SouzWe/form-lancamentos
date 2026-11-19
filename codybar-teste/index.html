@@ -1764,6 +1764,15 @@ function regiaoDoCep(bairro) {
   return perto.length === 1 ? perto[0] : "";   // nunca cria região: sem certeza, o vendedor escolhe
 }
 function mostrarDica(id, html) { const el = $("#" + id); if (!el) return; el.innerHTML = html; el.classList.toggle("oculto", !html); if ($("#frete_dica")) somar(); }
+// 19/11 (E11): dica + botão "Usar endereço do CEP?" ficam embaixo do CEP; se o teclado cobrir, a tela sobe até ele
+function verAcimaDoTeclado(el) {
+  const subir = () => {
+    if (!el || !el.isConnected) return;
+    const falta = el.getBoundingClientRect().bottom - (alturaVisivel() - 12);
+    if (falta > 0) window.scrollBy({ top: falta, behavior: "smooth" });
+  };
+  [0, 350, 800].forEach(ms => setTimeout(subir, ms));   // espera o teclado abrir
+}
 function buscarCep() {
   const d = val("c_cep").replace(/\D/g, "");
   if (d.length !== 8) { cepConsultado = ""; mostrarDica("c_cep_dica", ""); mostrarDica("c_end_dica", ""); return; }
@@ -1795,7 +1804,7 @@ function buscarCep() {
         if (!semLista) sel.value = OUTRO;
         novo.value = c.bairro; novo.classList.remove("oculto");
       };
-      if (!c.logradouro) { if (bairroLivre) usarBairro(); mostrarDica("c_end_dica", dica); return; }   // CEP geral: só a dica (como antes)
+      if (!c.logradouro) { if (bairroLivre) usarBairro(); mostrarDica("c_cep_dica", dica); return; }   // CEP geral: só a dica (como antes)
       const rua = c.logradouro + ", ", end = $("#c_end");
       const usarEnd = () => {
         end.value = rua; end.focus();
@@ -1805,11 +1814,12 @@ function buscarCep() {
       if (bairroLivre) usarBairro();
       if (endLivre) usarEnd();
       const conflito = (!endLivre && val("c_end") !== rua.trim() && val("c_end") !== rua) || (!bairroLivre && !bairroIgual);
-      if (!conflito) { mostrarDica("c_end_dica", dica); return; }
+      if (!conflito) { mostrarDica("c_cep_dica", dica); return; }
       // a mesma pergunta vale para os dois campos (Endereço e Bairro)
       const oque = [!endLivre && esc(c.logradouro), !bairroLivre && !bairroIgual && esc(reg || c.bairro)].filter(Boolean).join(" · ");
-      mostrarDica("c_end_dica", `${dica}<br><button type="button" class="cep-usar" id="cep_usar">Usar endereço do CEP? ${oque}</button>`);
-      $("#cep_usar").onclick = () => { usarBairro(); usarEnd(); mostrarDica("c_end_dica", dica); };
+      mostrarDica("c_cep_dica", `${dica}<br><button type="button" class="cep-usar" id="cep_usar">Usar endereço do CEP? ${oque}</button>`);
+      $("#cep_usar").onclick = () => { usarBairro(); usarEnd(); mostrarDica("c_cep_dica", dica); };
+      verAcimaDoTeclado($("#cep_usar"));
     })
     .catch(() => { clearTimeout(tempo); naoAchou(); });
 }
