@@ -49,6 +49,7 @@
   .dupla { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
   .total { text-align: right; font-weight: 600; margin-top: 8px; }
   .total .sub { font-weight: 400; color: var(--dica); }   /* 12/11 (I032): Subtotal e Desconto */
+  .total .moto { margin-top: 4px; }   /* 19/11 (E12): 🛵 com motoboy (só consulta) */
   .desconto { margin-top: 8px; }
   .enviar { position: fixed; left: 16px; right: 16px; bottom: 16px; padding: 14px; border: 0; border-radius: 12px;
             background: var(--btn); color: var(--btn-txt); font: 600 17px/1 inherit; }
@@ -1439,6 +1440,19 @@ function mostrarFrete() {
   d.textContent = e || (fv ? freteRot() : "");
 }
 const totalVenda = () => Math.round((subtotalVenda() - descValor() + freteValor()) * 100) / 100;   // total COM desconto e frete (pago, restante, frases)
+// 19/11 (E12): frete visível ANTES do 🛵 — só consulta; o Total continua sem frete (vale para 💾 e 🙋)
+function freteMoto() {
+  if (comEntregador() || !(tipo === "venda" || (tipo === "cliente" && temCompra()))) return null;
+  const reg = regiaoEntrega();
+  return reg ? { reg, fr: freteDaRegiao(reg) } : null;   // cliente sem bairro: sem linha
+}
+const totalMoto = fm => Math.round((subtotalVenda() - descValor() + fm.fr) * 100) / 100;
+function linhaMoto() {
+  const fm = freteMoto();
+  if (!fm) return "";
+  return `<div class="sub moto">${fm.fr > 0 ? esc(`🛵 com motoboy: ${reais(totalMoto(fm))} (frete ${fm.reg} ${reais(fm.fr)})`)
+    : "🛵 bairro sem frete, digite ao tocar em 🛵"}</div>`;
+}
 function somar() {
   const s = subtotalVenda(), dv = descValor(), fv = freteValor(), t = totalVenda();
   const rot = tipo === "divida" ? "Total do talão: " : "Total: ";
@@ -1448,6 +1462,7 @@ function somar() {
       + (dv ? `<div class="sub">Desconto: ${esc(pctTxt())} (− ${reais(dv)})</div>` : "")
       + (fv ? `<div class="sub">${esc(freteRot())}</div>` : "")
       + `<div>${esc(rot + reais(t))}</div>`;
+  if (s > 0) $("#total").insertAdjacentHTML("beforeend", linhaMoto());   // 19/11 (E12)
   mostrarFrete();
   pagamento();
 }
@@ -1456,8 +1471,11 @@ function somar() {
 // Pagou tudo → some a cobrança. Pagou parte → data do restante obrigatória.
 function pagamento() {
   if (!$("#pg_valor")) return;
-  const t = Math.round(totalVenda() * 100) / 100, pg = num(val("pg_valor"));
+  const t0 = Math.round(totalVenda() * 100) / 100, pg = num(val("pg_valor"));
   if (tipo === "cliente") $("#bloco-compra").classList.toggle("oculto", !temCompra());   // 08/11: sem produto = só cadastro
+  // 19/11 (E12): pago acima do total mas até o total com 🛵 = conta como motoboy (a trava real é no botão)
+  const fm = freteMoto(), tm = fm && fm.fr > 0 ? totalMoto(fm) : 0;
+  const moto = tm > 0 && pg > t0 + 0.005 && pg <= tm + 0.005, t = moto ? tm : t0;
   botoesSalvar();   // 18/11 (E9)
   const quitou = pg > 0 && t > 0 && pg >= t - 0.005;
   if (tipo === "divida")   // 11/11: a frase mora na COBRANÇA → quitado esconde só data/horário, não o bloco
@@ -1470,8 +1488,8 @@ function pagamento() {
   const tal = tipo === "divida";
   d.innerHTML = !pg ? (tal ? "Não recebeu nada? Deixe em branco e marque a data da cobrança." : "Não pagou agora? Deixe em branco e marque a data da cobrança.")
     : excesso ? (tal ? "Recebido maior que o total do talão." : "Pago maior que o total da venda.")
-    : quitou ? `<span>✅ ${tal ? "Talão quitado" : "Venda quitada"}</span><span>sem cobrança</span>`
-    : `Falta <b>${reais(t - pg)}</b> marque a data da cobrança do restante.`;
+    : quitou ? `<span>✅ ${tal ? "Talão quitado" : moto ? "Quitada com 🛵 motoboy" : "Venda quitada"}</span><span>sem cobrança</span>`
+    : `Falta <b>${reais(t - pg)}</b>${moto ? " com 🛵 motoboy," : ""} marque a data da cobrança do restante.`;
 }
 
 // Preço diferente da tabela = desconto/combinado: o texto avisa para o bot não trocar pelo de tabela.
