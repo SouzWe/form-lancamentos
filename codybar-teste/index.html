@@ -176,6 +176,12 @@
   .entrega input { width: auto; height: auto; margin: 0; padding: 0; accent-color: var(--btn); }
   .entrega label:has(input:checked) { background: var(--btn); color: var(--btn-txt); }
   .entrega.erro-frete, .entrega.erro-campo { border-color: var(--erro); }
+  /* 18/11 (E10): frete na hora — bairro sem frete no 🛵 Motoboy entrega */
+  .frete-box { margin-top: 10px; }
+  .frete-box .fr-linha { display: grid; grid-template-columns: auto 1fr; gap: 8px; align-items: center; }
+  .frete-box .fr-salvar { display: flex; align-items: center; gap: 8px; margin: 10px 0 0; cursor: pointer; }
+  .frete-box .fr-salvar input { width: auto; height: auto; margin: 0; padding: 0; accent-color: var(--btn); }
+  .frete-box .fr-salvar.oculto { display: none; }
   /* 14/11 (E3 + E4 🚚): Entregas (interno) — cartão por entrega + ações */
   .en-cad { margin-bottom: 6px; }
   .en-cad .add { margin-bottom: 4px; }
@@ -1398,16 +1404,32 @@ function regiaoEntrega() {
   if (tipo === "cliente") { const s = val("c_bairro"); return s === OUTRO ? val("c_bairro_novo") : s; }
   return "";
 }
+// 18/11 (E10): frete salvo por ESTE celular ("☑ Salvar como frete do bairro") vale até os botões trazerem o link novo
+function fretesSalvos() { try { return JSON.parse(localStorage.getItem("cb_fretes_salvos") || "{}") || {}; } catch (_) { return {}; } }
+function guardarFrete(reg, v) { try { const s = fretesSalvos(); s[reg] = v; localStorage.setItem("cb_fretes_salvos", JSON.stringify(s)); } catch (_) {} }
 function freteDaRegiao(reg) {
   if (!reg) return 0;
-  const k = Object.keys(FRETES).find(x => sem(x).trim() === sem(reg).trim());
-  return k ? Number(FRETES[k]) || 0 : 0;
+  const achar = o => Object.keys(o).find(x => sem(x).trim() === sem(reg).trim());
+  const k = achar(FRETES); if (k) return Number(FRETES[k]) || 0;
+  const s = fretesSalvos(), k2 = achar(s);
+  return k2 ? Number(s[k2]) || 0 : 0;
 }
-const freteValor = () => comEntregador() ? freteDaRegiao(regiaoEntrega()) : 0;
-const FRETE_ERRO = "Região sem frete definido: escolha Eu entrego ou defina o frete da região.";
-const freteErro = () => comEntregador() && !(freteValor() > 0) ? FRETE_ERRO : "";
-const freteRot = () => `Frete (${regiaoEntrega()}): ${reais(freteValor())}`;
+// 18/11 (E10): 🛵 com bairro sem frete (ou cliente sem bairro, ou bairro novo) = campo do frete, somando na hora
+const freteNaHora = () => comEntregador() && !(freteDaRegiao(regiaoEntrega()) > 0);
+const freteDigitado = () => lerValorBR(val("frete_val"));
+const freteValor = () => !comEntregador() ? 0 : freteNaHora() ? (freteDigitado() > 0 ? freteDigitado() : 0) : freteDaRegiao(regiaoEntrega());
+const FRETE_ERRO = "Falta o valor do frete.", FRETE_INV = "Valor do frete inválido (ex.: 15,00).";
+const freteErro = () => !freteNaHora() ? "" : isNaN(freteDigitado()) && val("frete_val") ? FRETE_INV : !(freteDigitado() > 0) ? FRETE_ERRO : "";
+const freteRot = () => `Frete (${regiaoEntrega() || "sem bairro"}): ${reais(freteValor())}`;
+const salvarFreteBairro = () => freteNaHora() && !!regiaoEntrega() && !!($("#frete_salvar") && $("#frete_salvar").checked);
 function mostrarFrete() {
+  const fb = $("#frete_box");
+  if (fb) {
+    const reg = regiaoEntrega();
+    fb.classList.toggle("oculto", !freteNaHora());
+    $("#frete_aviso").textContent = reg ? "⚠️ bairro sem frete" : "⚠️ cliente sem bairro";
+    $("#frete_salvar_l").classList.toggle("oculto", !reg); $("#frete_reg").textContent = reg;
+  }
   const eb = $("#ent_box"); if (eb) eb.classList.toggle("oculto", !comEntregador());   // 17/11 (E2): só com 🚚 Entregador
   const d = $("#frete_dica");
   if (!d) return;
@@ -1495,6 +1517,10 @@ const linhaCel = () => !val("v_cel") ? "Celular: não informado"
 const PRODUTOS_HTML = (titulo) => `<fieldset><legend>${titulo}</legend><div id="produtos"></div>
   <button type="button" class="add" id="add">+ produto</button>
   <div class="desconto">${CAMPO("desc_pct", "Desconto %", "text", 'inputmode="decimal" placeholder="0"')}</div>
+  <div class="frete-box oculto" id="frete_box">
+    <label for="frete_val">🛵 Frete: <span id="frete_aviso">⚠️ bairro sem frete</span></label>
+    <div class="fr-linha"><span>R$</span><input id="frete_val" type="text" inputmode="decimal" placeholder="0,00"></div>
+    <label class="fr-salvar" id="frete_salvar_l"><input type="checkbox" id="frete_salvar" checked> Salvar como frete do <b id="frete_reg"></b></label></div>
   <div class="total" id="total"></div></fieldset>`;
 const OBS = `<label for="obs">Observação</label><textarea id="obs"></textarea>`;
 const obsLinha = () => val("obs") ? ["", `Obs: ${val("obs")}`] : [];
@@ -1592,6 +1618,7 @@ ajustarModalTalao();   // 12/11: Débitos abre no Já cadastrado (sem Desconto %
 // 13/11 (E2 🚚): trocar o bairro (Cliente novo) refaz o frete e o total
 if ($("#c_bairro")) $("#c_bairro").addEventListener("change", somar);
 if ($("#c_bairro_novo")) $("#c_bairro_novo").addEventListener("input", somar);
+if ($("#frete_val")) $("#frete_val").addEventListener("input", somar);   // 18/11 (E10): total soma a cada tecla
 
 // 12/11 (Wellington): data/horário/escolha sem valor ficam cinza (classe "vazio"); com valor, cor normal
 function marcarVazios() {
@@ -1607,7 +1634,9 @@ marcarVazios();
 const linhasDesconto = () => [
   ...(descValor() || freteValor() ? [`Subtotal: ${reais(subtotalVenda())}`] : []),
   ...(descValor() ? [`Desconto: ${pctTxt()} (− ${reais(descValor())})`] : []),
-  ...(freteValor() ? [freteRot()] : [])];
+  ...(freteValor() ? [freteRot()] : []),
+  // 18/11 (E10): frete digitado na hora (bairro sem frete) → o bot passa --frete (e --salvar-frete se marcado)
+  ...(freteNaHora() && freteValor() ? [`Frete na hora: ${salvarFreteBairro() ? "salvar como frete do bairro" : "só esta venda"}`] : [])];
 function montarTexto() {
   // Total + pago na hora + cobrança: iguais na Venda nova e na 1ª compra do Cliente novo (08/11)
   const fechamento = () => {
@@ -1813,7 +1842,7 @@ function mostrarSituacao(c) {
 
 function conferirPagamento() {
   if (!descOk()) return "Desconto precisa ser de 0,01% a 99,99% (ou deixe em branco).";
-  if (freteErro()) return FRETE_ERRO;   // 13/11 (E2 🚚): 🚚 só com frete definido na região
+  if (freteErro()) return freteErro();   // 18/11 (E10): só trava com o campo do frete vazio (ou inválido)
   const t = totalVenda(), pg = num(val("pg_valor"));
   if (val("pg_valor") && pg <= 0) return "Valor pago inválido.";
   if (pg > t + 0.005) return tipo === "divida" ? "Recebido maior que o total do talão." : "Pago maior que o total da venda.";
@@ -1881,7 +1910,7 @@ function camposDoErro(e) {
   else if (e.startsWith("Falta a data do recebimento")) m = um("rec_data");
   else if (/falta a data da cobrança|Falta a data da cobrança/.test(e)) m = um("cobranca");
   else if (e.startsWith("Desconto precisa")) m = um("desc_pct");
-  else if (e === FRETE_ERRO) m = um("sv_moto");   // 13/11 (E2 🚚); 18/11 (E9): o botão 🛵 Motoboy entrega
+  else if (e === FRETE_ERRO || e === FRETE_INV) m = um("frete_val");   // 18/11 (E10): o campo do frete
   m = m.filter(Boolean);
   return { marcar: m, ir: m[0] || null };
 }
@@ -1943,7 +1972,12 @@ function salvarComo(modo) {
   const erro = conferir();
   mostrarAviso(erro); marcarErro(erro);
   if (erro) return;
-  const salvar = () => { $("#salvar3").innerHTML = `<div class="en-proc">⏳ processando…</div>`; entregar(montarTexto()); };
+  const salvar = () => {
+    $("#salvar3").innerHTML = `<div class="en-proc">⏳ processando…</div>`;
+    const texto = montarTexto();
+    if (salvarFreteBairro()) guardarFrete(regiaoEntrega(), freteValor());   // 18/11 (E10): a próxima venda já vem com ele
+    entregar(texto);
+  };
   if (modo !== "entregador") { salvar(); return; }
   if (!ENTREGADORES.length) { mostrarAviso("Nenhum entregador cadastrado: use + Entregador na 🚚 Entregas."); return; }
   abrirListaEnt(salvar, () => { MODO_ENTREGA = "vendedor"; ENT_ESC = ""; somar(); });   // ✕ = não salva, tira o frete
