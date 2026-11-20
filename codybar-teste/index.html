@@ -78,9 +78,6 @@
   .campo-ruim input { border: 1px solid var(--erro); }
   .cel-msg { color: var(--erro); font-size: 13px; margin-top: 6px; }
   .cel-msg:empty { display: none; }
-  /* 08/11 (Wellington, teste): pergunta ao assistente no fim do formulário — botão próprio, não grava nada */
-  .perguntar { width: 100%; margin-top: 8px; padding: 12px; border: 1px solid var(--btn); border-radius: 10px;
-    background: none; color: var(--btn); font: 600 15px/1 inherit; }
   /* 08/11 (Wellington): rótulo do WhatsApp — vazio = "WhatsApp" verde transparente; certo = "WhatsApp" + borda verdes;
      sem DDD = só "(com DDD)" vermelho */
   .lb-wpp { color: rgba(46, 158, 91, .55); }
@@ -778,7 +775,7 @@ function montarEntregas() {
   const lista = ENTREGAS_LISTA.map(e => ({ ped: e[0], cli: e[1], nome: e[2], cel: celSalvo(e[1]) || e[3], reg: e[4] || "", end: e[5] || "",
     ref: e[6] || "", cep: String(e[7] || ""), cobrar: Number(e[8]) || 0, saiu: e[9] === 1, saida: e[10] || "", ent: e[11] === "@" ? "" : e[11] || "", eu: e[11] === "@",
     // 14/11: 13º-16º = deve no total, débitos em aberto (inclui esta entrega), talão, situação do talão (só se deve além desta entrega)
-    hora: e[16] || "", frete: Number(e[17]) || 0,
+    hora: e[16] || "", frete: Number(e[17]) || 0, recado: String(e[18] || ""),   // 20/11 (E14 📝)
     deve: e[12] != null ? { total: Number(e[12]) || 0, aberto: Number(e[13]) || 0, talao: Number(e[14]) || 0, tsit: String(e[15] || "") } : null }));
   // 17/11 (E2): o entregador pode vir da Venda nova (planilha). Antes do 🛵 Saiu, a escolha feita no card vale mais
   // (inclusive "-" = removido no card). Depois do Saiu vale o da planilha. Eu entrego não tem entregador.
@@ -1041,7 +1038,8 @@ function montarEntregas() {
       + `<div class="en-topo3"><span class="en-eu">${x.eu ? "🙋 Eu entrego" : "🛵 " + esc(ent ? nomeEnt(ent) : "Motoboy")}</span><span class="en-chip">${st}</span></div>`
       // 17/11 (E5b): endereço em 2 linhas (bairro em cima, rua embaixo), sem rótulos; "—" se faltar
       + `<div class="en-end"><div class="cb-li">${x.reg ? esc(x.reg) : `<span class="en-vazio">sem região</span>`}</div>`
-      + `<div class="cb-li">${x.end ? esc(x.end) : `<span class="en-vazio">—</span>`}</div></div>`
+      + `<div class="cb-li">${x.end ? esc(x.end) : `<span class="en-vazio">—</span>`}</div>`
+      + (x.recado ? `<div class="cb-li">📝 ${esc(x.recado)}</div>` : "") + `</div>`   // 20/11 (E14): recado do pedido abaixo do endereço
       + (x.cobrar > 0 ? `<div class="cb-li">💰 Cobrar nesta entrega: <b class="en-valor">${reais(x.cobrar)}</b></div>` : `<div class="cb-li en-pago">✅ Já pago</div>`)
       // 17/11 (E5): frete embaixo do valor (linha sempre presente; "—" sem frete)
       + `<div class="cb-li">🚚 Frete${x.reg && x.frete ? " (" + esc(x.reg) + ")" : ""}: ${x.frete ? reais(x.frete) : `<span class="en-vazio">—</span>`}</div>`
@@ -1544,7 +1542,9 @@ const PRODUTOS_HTML = (titulo) => `<fieldset><legend>${titulo}</legend><div id="
     <label class="fr-salvar" id="frete_salvar_l"><input type="checkbox" id="frete_salvar" checked> Salvar como frete do <b id="frete_reg"></b></label></div>
   <div class="total" id="total"></div></fieldset>`;
 const OBS = `<label for="obs">Observação</label><textarea id="obs"></textarea>`;
-const obsLinha = () => val("obs") ? ["", `Obs: ${val("obs")}`] : [];
+// 20/11 (E14 📝): na Venda nova a Observação vira o recado do pedido (vai à cobrança e ao card da 🚚 Entregas)
+const RECADO = `<label for="obs">📝 Recado do pedido (opcional)</label><textarea id="obs" placeholder="Ex.: confirmar com ele antes de sair · portão azul"></textarea>`;
+const obsLinha = () => val("obs") ? ["", `${tipo === "venda" ? "📝 Recado" : "Obs"}: ${val("obs")}`] : [];
 
 // ---------- os 3 formulários ----------
 let modoCliente = "cadastrado";   // débitos anteriores: "cadastrado" ou "novo"
@@ -1559,7 +1559,7 @@ if (tipo === "venda") {
     ${ENTREGA_HTML}
     ${PAGAMENTO_HTML}
     ${COBRANCA_HTML}
-    <fieldset>${OBS}</fieldset>`;
+    <fieldset>${RECADO}</fieldset>`;
 } else if (tipo === "cliente") {
   $("#titulo").textContent = "👤 Cliente novo";
   form.innerHTML = `
@@ -1627,12 +1627,7 @@ function mostrarDatasTalao() {
   if ($("#caixa-rec-data")) $("#caixa-rec-data").classList.toggle("oculto", !val("pg_valor"));
 }
 // 08/11 (Wellington): voltou atrás — as 4 datas ficam sempre à mostra (a do recebimento continua vindo em branco)
-// 💬 Pergunta ao assistente (08/11, teste do Wellington — se não gostar, remover este bloco e o do botão)
-// 12/11 (Wellington): saiu do Débitos — fica só na Venda nova
-if (tipo === "venda") form.insertAdjacentHTML("beforeend", `<fieldset><legend>💬 Perguntar ao assistente</legend>
-  <textarea id="pergunta" placeholder="Ex.: quanto esse cliente comprou este mês? · quem tem cobrança vencida hoje?"></textarea>
-  <button type="button" class="perguntar" id="perguntar">Perguntar</button>
-  <div class="dica">Não grava nada. A resposta chega na conversa.</div></fieldset>`);
+// 20/11 (E14): o bloco "💬 Perguntar ao assistente" saiu; a pergunta vai pelo 📝 Recado (sem produto = só pergunta)
 linhaProduto();   // linha vazia é ignorada no envio (primeira compra do cliente novo é opcional)
 ligarBusca(); ligarCadastro(); ligarCel("c_cel"); ligarCel("v_cel"); ligarCep();
 ajustarModalTalao();   // 12/11: Débitos abre no Já cadastrado (sem Desconto %)
@@ -1980,7 +1975,6 @@ function entregar(texto) {
 }
 $("#enviar").onclick = () => {
   const nadaLancado = !produtos().some(p => p.nome || p.busca) && !val("ant_valor") && !val("pg_valor");
-  if ($("#pergunta") && val("pergunta") && nadaLancado) { perguntar(); return; }
   const erro = conferir();
   mostrarAviso(erro);
   marcarErro(erro);   // 12/11: borda vermelha + rola até o campo
@@ -1997,7 +1991,7 @@ function botoesSalvar() {
 }
 function salvarComo(modo) {
   const nadaLancado = !produtos().some(p => p.nome || p.busca) && !val("ant_valor") && !val("pg_valor");
-  if ($("#pergunta") && val("pergunta") && nadaLancado) { perguntar(); return; }
+  if (tipo === "venda" && val("obs") && nadaLancado) { perguntar(); return; }   // 20/11 (E14): 📝 sem produto = pergunta
   MODO_ENTREGA = modo; if (modo !== "entregador") ENT_ESC = "";
   somar();   // 🛵 soma o frete da região no total; 💾 / 🙋 sem frete
   const erro = conferir();
@@ -2024,13 +2018,14 @@ if (tipo === "venda" || tipo === "cliente") {
   botoesSalvar();
 }
 // 08/11 (Wellington): basta o cliente escolhido (os dados dele já aparecem); sem cliente, bloqueia.
+// 20/11 (E14): a pergunta vem do 📝 Recado (Venda nova sem produto); texto ao bot igual ao de antes
 function perguntar() {
   if (!clienteEscolhido) { mostrarAviso("Escolha o cliente para perguntar."); return; }
-  const p = val("pergunta");
+  const p = val("obs");
   if (!p) { mostrarAviso("Escreva a pergunta."); return; }
+  $("#salvar3").innerHTML = `<div class="en-proc">⏳ processando…</div>`;
   entregar(["💬 PERGUNTA AO ASSISTENTE", "", `Cliente: ${clienteEscolhido[1]} (${clienteEscolhido[0]})`, `Pergunta: ${p}`].join("\n"));
 }
-if ($("#perguntar")) $("#perguntar").onclick = perguntar;
 
 if (tg) { tg.ready(); tg.expand(); }
 }
