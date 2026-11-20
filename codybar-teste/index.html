@@ -50,6 +50,7 @@
   .total { text-align: right; font-weight: 600; margin-top: 8px; }
   .total .sub { font-weight: 400; color: var(--dica); }   /* 12/11 (I032): Subtotal e Desconto */
   .total .moto { margin-top: 4px; }   /* 19/11 (E12): 🛵 com motoboy (só consulta) */
+  .total .moto .v { color: var(--ok); }   /* 20/11 (E12b): só os valores em verde */
   .desconto { margin-top: 8px; }
   .enviar { position: fixed; left: 16px; right: 16px; bottom: 16px; padding: 14px; border: 0; border-radius: 12px;
             background: var(--btn); color: var(--btn-txt); font: 600 17px/1 inherit; }
@@ -1450,7 +1451,9 @@ const totalMoto = fm => Math.round((subtotalVenda() - descValor() + fm.fr) * 100
 function linhaMoto() {
   const fm = freteMoto();
   if (!fm) return "";
-  return `<div class="sub moto">${fm.fr > 0 ? esc(`🛵 com motoboy: ${reais(totalMoto(fm))} (frete ${fm.reg} ${reais(fm.fr)})`)
+  // 20/11 (E12b): quebra antes do frete; valores em verde
+  return `<div class="sub moto">${fm.fr > 0 ? `🛵 com motoboy: <span class="v">${reais(totalMoto(fm))}</span><br>`
+      + `(frete ${esc(fm.reg)} <span class="v">${reais(fm.fr)}</span>)`
     : "🛵 bairro sem frete, digite ao tocar em 🛵"}</div>`;
 }
 function somar() {
