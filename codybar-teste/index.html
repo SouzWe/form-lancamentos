@@ -1663,9 +1663,11 @@ function montarTexto() {
       : [`${pg > 0 ? `Restante ${reais(t - pg)} · data` : "Data"} de cobrança: ${br(val("cobranca"))}`, ...linhaHoraCobranca()];
     // 13/11 (E2 🚚): Eu entrego = nenhuma linha nova; 🚚 Entregador = "Entrega: 🚚 Entregador" + linha do Frete
     // 17/11 (E2): entregador escolhido na Venda nova → "Entregador: Nome (ENT-NN)" logo abaixo
-    // 18/11 (E9): 💾 Salvar direto = "Entrega: 💾 Salvar direto (…)" (sem card); 🙋 Eu entrego = nenhuma linha (igual a hoje)
+    // 18/11 (E9): 💾 Salvar direto = "Entrega: 💾 Salvar direto (…)" (sem card)
+    // 21/11 (E16): 🙋 Eu entrego também manda a linha ("Entrega: 🙋 Eu entrego"): a venda sempre diz como vai a entrega
     const eg = comEntregador() ? ENTREGADORES.find(g => g[0] === ENT_ESC) : null;
     return [...(MODO_ENTREGA === "balcao" ? ["Entrega: 💾 Salvar direto (cliente levou na hora, sem card na 🚚 Entregas)"] : []),
+      ...(MODO_ENTREGA === "vendedor" ? ["Entrega: 🙋 Eu entrego"] : []),
       ...(comEntregador() ? ["Entrega: 🚚 Entregador", ...(eg ? [`Entregador: ${eg[1]} (${eg[0]})`] : [])] : []), ...linhasDesconto(), `Total: ${reais(t)}`, "", ...pago, ...cob];
   };
   if (tipo === "venda") {
