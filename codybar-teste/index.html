@@ -793,6 +793,7 @@ function montarEntregas() {
     return [`🚚 Entrega · ${x.nome}`,
       `📍 ${[x.end, x.reg, x.cep ? "CEP " + cepFmt(x.cep) : ""].filter(Boolean).join(", ") || "endereço não cadastrado"}`,
       ...(x.ref ? [`📌 Ref.: ${x.ref}`] : []),
+      ...(x.recado ? [`📝 Recado: ${x.recado}`] : []),   // 21/11 (E14c): recado também na mensagem do entregador
       ...(digitosNumero(x.cel) ? [`📞 Cliente: ${fmtCel(x.cel)}`] : []),
       x.cobrar > 0 ? `💰 Cobrar: ${reais(x.cobrar)}` : "💰 Já pago (não cobrar)",
       ...(temEnd(x) ? [`🗺️ Rota: https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(destino(x))}`] : []),
