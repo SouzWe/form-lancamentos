@@ -15,6 +15,8 @@
     --btn-txt: var(--tg-theme-button-text-color, #ffffff);
     --erro: #d64545;
     --ok: #2e9e5b;
+    --vazio-alfa: .5;    /* 12/11 (Wellington): opacidade do texto de dentro dos campos — ajustar só este número (1 = sólido, 0 = invisível) */
+    --vazio: rgba(169, 169, 169, var(--vazio-alfa));   /* cinza (darkgray) do exemplo e dos campos vazios */
     --fixo: #f59e0b;   /* 08/11: fixo de empresa (DDD + 8) — amarelo quase laranja, para não confundir com o vermelho */
   }
   * { box-sizing: border-box; }
@@ -29,6 +31,10 @@
   label[for=c_hora_de], label[for=c_hora_ate] { font-size: 12px; white-space: nowrap; }   /* 08/11: "Melhor horário da visita" cabe na linha (-2) */
   input, select, textarea { width: 100%; padding: 11px 12px; border: 1px solid transparent; border-radius: 10px;
          background: var(--campo); color: var(--txt); font: inherit; }
+  /* 12/11 (Wellington): campo vazio (data "dd/mm/aaaa", escolha "—" / "— (sem horário)") no mesmo cinza do exemplo dos outros campos */
+  ::placeholder { color: var(--vazio); opacity: 1; }
+  input.vazio, select.vazio { color: var(--vazio); }
+  select.vazio option { color: var(--txt); }
   input:focus, select:focus, textarea:focus { outline: none; border-color: var(--btn); }
   textarea { min-height: 64px; resize: vertical; }
   .linha { display: grid; gap: 8px; align-items: end; margin-bottom: 8px; }
@@ -42,8 +48,23 @@
          color: var(--btn); font: inherit; }
   .dupla { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
   .total { text-align: right; font-weight: 600; margin-top: 8px; }
+  .total .sub { font-weight: 400; color: var(--dica); }   /* 12/11 (I032): Subtotal e Desconto */
+  .total .moto { margin-top: 4px; }   /* 19/11 (E12): 🛵 com motoboy (só consulta) */
+  .total .moto .v { color: var(--ok); }   /* 20/11 (E12b): só os valores em verde */
+  .desconto { margin-top: 8px; }
   .enviar { position: fixed; left: 16px; right: 16px; bottom: 16px; padding: 14px; border: 0; border-radius: 12px;
             background: var(--btn); color: var(--btn-txt); font: 600 17px/1 inherit; }
+  /* 18/11 (E9): Venda nova / 1ª compra — o salvar vira 3 botões no MESMO estilo do modal da 🗺️ Cobranças
+     (classes .pg-op.tres: mesmo tamanho, emoji ao lado do texto, o texto quebra sozinho se não couber) */
+  /* 18/11 (E9 ajuste): no fim do formulário (não flutuante), na cor azul do botão selecionado (.pg-op button.on) */
+  /* 18/11 (E9 ajuste 2): mesmo espaço em cima e embaixo da fileira; texto no meio do botão (altura e largura) */
+  .salvar3 { margin-top: 48px; }   /* embaixo: 48px = espaço do aviso (vazio) + padding 0 */
+  body:has(#salvar3:not(.oculto)) { padding-bottom: 0; }
+  .salvar3.pg-op button { background: var(--btn); color: var(--btn-txt); font-weight: 600;
+                          display: flex; align-items: center; justify-content: center; text-align: center; }
+  .salvar3 button.erro-campo { border-color: var(--erro); }
+  .salvar3 .en-proc { grid-column: 1 / -1; background: var(--campo); border-radius: 12px; padding: 14px 0; }
+  .salvar3.oculto { display: none; }
   .aviso { color: var(--erro); font-size: 14px; min-height: 20px; }
   /* 08/11 (Wellington): erro ao enviar aparece no TOPO da tela (acima do teclado), em faixa vermelha */
   .aviso:not(:empty) { position: fixed; left: 16px; right: 16px; top: 8px; z-index: 50; min-height: 0;
@@ -57,9 +78,6 @@
   .campo-ruim input { border: 1px solid var(--erro); }
   .cel-msg { color: var(--erro); font-size: 13px; margin-top: 6px; }
   .cel-msg:empty { display: none; }
-  /* 08/11: pergunta ao assistente no fim do formulário — botão próprio, não grava nada */
-  .perguntar { width: 100%; margin-top: 8px; padding: 12px; border: 1px solid var(--btn); border-radius: 10px;
-    background: none; color: var(--btn); font: 600 15px/1 inherit; }
   /* 08/11 (Wellington): rótulo do WhatsApp — vazio = "WhatsApp" verde transparente; certo = "WhatsApp" + borda verdes;
      sem DDD = só "(com DDD)" vermelho */
   .lb-wpp { color: rgba(46, 158, 91, .55); }
@@ -77,11 +95,57 @@
   .situacao .deve b, .situacao .total b { color: var(--erro); }  /* …só o valor em vermelho (igual ao "Falta R$ X") */
   .situacao .total { text-align: left; margin-top: 2px; }
   .situacao .limpo { color: var(--ok); font-weight: 600; }
+  /* 13/11 (C045/C116): 🗺️ Cobranças por região — só consulta. Layout v2 (13/11, Wellington) */
+  .cb-busca { margin-bottom: 4px; }
+  /* faixa da região: largura total, cinza claro, sem cantos; letra igual às legendas ("CADASTRO") */
+  .cb-reg { display: flex; justify-content: space-between; gap: 12px; margin: 30px -16px 4px; padding: 9px 16px;
+            background: var(--campo); border-radius: 0; font-weight: 600; font-size: 14px; text-transform: uppercase;
+            letter-spacing: .03em; color: var(--dica); }
+  .cb-reg b { white-space: nowrap; font-weight: 600; }
+  /* cliente: mais espaço em cima/embaixo; linha contínua embaixo de TODOS (texto 50%) */
+  .cb-item { padding: 16px 0 14px; border-bottom: 1px solid rgba(127, 127, 127, .5);
+             border-bottom-color: color-mix(in srgb, var(--txt) 50%, transparent); }
+  .cb-item:has(+ .cb-total) { border-bottom: 0; }   /* antes do total vale só a linha do total */
+  .cb-nome { font-weight: 600; font-size: 15px; padding-right: 44px; }
+  /* 13/11: 🗺️ rota no canto superior direito do bloco (acima do número); sem endereço nem CEP = apagado */
+  .cb-item { position: relative; }
+  .cb-rota { position: absolute; top: 10px; right: 0; border: 0; background: none; padding: 4px 6px;
+             font-size: 22px; line-height: 1; cursor: pointer; }
+  .cb-rota.off { opacity: .25; cursor: default; }
+  /* 13/11: escolha do app da rota (folha de baixo); toque fora ou ✕ fecha; último app usado em destaque */
+  .cb-fundo { position: fixed; inset: 0; z-index: 60; background: rgba(0, 0, 0, .45); display: flex; align-items: flex-end; }
+  .cb-folha { width: 100%; background: var(--bg); color: var(--txt); border-radius: 16px 16px 0 0;
+              padding: 14px 16px calc(18px + env(safe-area-inset-bottom)); box-shadow: 0 -6px 24px rgba(0, 0, 0, .3); }
+  .cb-folha-topo { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 12px; }
+  .cb-folha-topo b { font-size: 15px; }
+  .cb-folha-x { border: 0; background: none; color: var(--dica); font-size: 20px; padding: 4px 8px; cursor: pointer; }
+  .cb-apps { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .cb-apps button { padding: 12px 8px; border: 1px solid transparent; border-radius: 12px; background: var(--campo);
+                    color: var(--txt); font: inherit; font-size: 14px; cursor: pointer; }
+  .cb-apps button.ultimo { border-color: var(--btn); background: var(--btn); color: var(--btn-txt); font-weight: 600; }
+  .cb-toast { position: fixed; left: 50%; bottom: 28px; transform: translateX(-50%); z-index: 70; padding: 8px 16px;
+              border-radius: 999px; background: rgba(0, 0, 0, .8); color: #fff; font-size: 14px; }
+  .cb-li { font-size: 14px; margin-top: 3px; }
+  .cb-li.atraso { color: var(--erro); }
+  .cb-cel { text-align: right; margin-top: 10px; }   /* número no fim do bloco, à direita */
+  .cb-total { border-top: 1px solid rgba(127, 127, 127, .85); border-top-color: color-mix(in srgb, var(--txt) 85%, transparent);
+              margin-top: 14px; padding-top: 14px; font-weight: 600; }
+  /* 13/11: o número é o botão (pílula) — mesmas cores do campo WhatsApp do formulário */
+  .cb-num { display: inline-block; border: 1px solid currentColor; border-radius: 999px; padding: 3px 12px;
+            background: transparent; font: inherit; font-size: 13px; line-height: 1.4; }
+  button.cb-num { cursor: pointer; }
+  .cb-num.ok { color: var(--ok); } .cb-num.fixo { color: var(--fixo); } .cb-num.erro { color: var(--erro); }
+  .cb-vazio { color: var(--ok); font-weight: 600; margin-top: 18px; }
+  .cb-nada { color: var(--dica); margin-top: 18px; }
   .situacao .rot { color: var(--dica); margin-top: 6px; }   /* 09/11: rótulo "Débitos em aberto:" / "Débito anterior:" */
   .sem-ddd .ddi input { border: 1px solid var(--erro); }
   /* 08/11: CEP — 8 números: certo = borda verde, errado = borda vermelha; vazio pode */
   .cep-ok input { border: 1px solid var(--ok); }
   .cep-ruim input { border: 1px solid var(--erro); }
+  /* 13/11 (I034): endereço pelo CEP */
+  .cep-usar { margin-top: 6px; padding: 6px 12px; border: 1px solid var(--ok); border-radius: 999px;
+              background: none; color: var(--ok); font: inherit; font-size: 13px; cursor: pointer; }
+  input.erro-campo, select.erro-campo, .add.erro-campo { border: 1px solid var(--erro) !important; }   /* 12/11: campo do erro ao enviar */
   pre { white-space: pre-wrap; background: var(--campo); padding: 12px; border-radius: 10px; font-size: 13px; }
   .abas { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; background: var(--campo); padding: 4px;
           border-radius: 12px; margin-bottom: 14px; }
@@ -99,10 +163,156 @@
   /* 07/11: "Falta" em caixa igual ao Total; valor vermelho (saldo devedor), quitada em verde */
   .dica.caixa { display: flex; justify-content: space-between; align-items: center; padding: 12px 14px;
                 border-radius: 10px; background: var(--campo); font-size: 14px; margin-top: 10px; }
-  .dica.deve { color: var(--txt); }      /* 07/11: frase em branco (cor do texto do tema) */
+  .dica.deve { color: var(--txt); }      /* 07/11: frase em branco (cor do texto do tema), teste */
   .dica.deve b { color: var(--erro); }   /* 07/11: frase simples (caixa recusada), só o valor em vermelho */
   .dica.quitada { border: 1px solid var(--ok); color: var(--ok); font-weight: 600; }
   .dica.excesso { color: var(--erro); }
+  /* 13/11 (E2 🚚): Entrega — Eu entrego (padrão, sem frete) | 🚚 Entregador (frete da região). Sem frete = borda vermelha */
+  .entrega { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; background: var(--campo); padding: 4px;
+             border-radius: 12px; border: 1px solid transparent; }
+  .entrega label { display: flex; align-items: center; justify-content: center; gap: 8px; margin: 0; padding: 10px;
+                   border-radius: 9px; cursor: pointer; font-size: 15px; color: var(--txt); }
+  .entrega input { width: auto; height: auto; margin: 0; padding: 0; accent-color: var(--btn); }
+  .entrega label:has(input:checked) { background: var(--btn); color: var(--btn-txt); }
+  .entrega.erro-frete, .entrega.erro-campo { border-color: var(--erro); }
+  /* 18/11 (E10): frete na hora — bairro sem frete no 🛵 Motoboy entrega */
+  .frete-box { margin-top: 10px; }
+  .frete-box .fr-linha { display: grid; grid-template-columns: auto 1fr; gap: 8px; align-items: center; }
+  .frete-box .fr-salvar { display: flex; align-items: center; gap: 8px; margin: 10px 0 0; cursor: pointer; }
+  .frete-box .fr-salvar input { width: auto; height: auto; margin: 0; padding: 0; accent-color: var(--btn); }
+  .frete-box .fr-salvar.oculto { display: none; }
+  /* 14/11 (E3 + E4 🚚): Entregas (interno) — cartão por entrega + ações */
+  .en-cad { margin-bottom: 6px; }
+  .en-cad .add { margin-bottom: 4px; }
+  .en-form { margin-top: 8px; padding: 12px; border-radius: 12px; background: var(--campo); }
+  .en-form input { background: var(--bg); }
+  .en-form .ddi span { background: var(--bg); }
+  .en-salvar { width: 100%; margin-top: 12px; padding: 12px; border: 0; border-radius: 10px; background: var(--btn);
+               color: var(--btn-txt); font: 600 15px/1 inherit; cursor: pointer; }
+  .en-ents { color: var(--dica); font-size: 13px; margin: 2px 0 6px; }
+  .en-item { position: relative; padding: 16px 0 14px; border-bottom: 1px solid rgba(127, 127, 127, .5);
+             border-bottom-color: color-mix(in srgb, var(--txt) 50%, transparent); }
+  .en-ped { color: var(--dica); font-size: 12px; margin-top: 2px; }
+  /* 17/11 (E4 toda venda no card): etiqueta do Eu entrego */
+  .en-eu { display: inline-block; margin-left: 6px; padding: 1px 8px; border-radius: 999px; border: 1px solid currentColor; font-size: 11px; }
+  .en-st { font-size: 14px; margin-top: 3px; font-weight: 600; }
+  /* 17/11 (E5 etapa A): card de tamanho fixo — cada linha numa linha só (texto longo vira "…"), bloco "quanto deve"
+     sempre com as mesmas linhas, área dos botões com altura reservada (botões alinhados embaixo) */
+  .en-item .cb-nome, .en-item .en-ped, .en-item .cb-li, .en-item .en-deve > div { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .en-item .en-acoes { min-height: 162px; align-content: end; }
+  .en-proc { grid-column: 1 / -1; align-self: end; text-align: center; font-size: 13px; color: var(--dica); padding: 6px 0; }
+  .en-vazio { color: var(--dica); }
+  /* 17/11 (E5b): uma linha em branco entre nome / pedido / endereço / cobrança */
+  .en-item .en-ped, .en-item .en-end, .en-item .en-end + .cb-li { margin-top: 1.2em; }
+  .en-item .en-end .cb-li { margin-top: 0; }
+  .en-st.saiu { color: var(--fixo); }
+  .en-pago { color: var(--ok); }
+  /* 17/11 (E5c): data/hora da venda embaixo do nº do pedido (mesma fonte); só o valor a cobrar em verde */
+  .en-item .en-ped.en-data { margin-top: 0; }
+  /* 17/11 (E6): linha de baixo = "17/11 11:43 · etiqueta" inteira (só desvia do 🗺️, não do chip) */
+  .en-item .en-ped.en-data { padding-right: 56px; text-overflow: clip; }
+  .en-data .en-eu { margin-left: 0; }
+  /* 17/11 (E6 etapa B): abas 🕓 Pedidos / 🛵 A caminho + aviso de cliente com 2+ pedidos (linha sempre presente) */
+  .en-abas { margin-bottom: 4px; }
+  .en-item .en-junto { font-size: 13px; color: var(--fixo); }
+  .en-item.pend .en-junto { color: #b26b00; }
+  .en-valor { color: var(--ok); }
+  .en-acoes { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 10px; }
+  .en-acoes button { padding: 10px 4px; border: 1px solid transparent; border-radius: 10px; background: var(--campo);
+                     color: var(--txt); font: inherit; font-size: 13px; cursor: pointer; }
+  .en-acoes button.zap { grid-column: 1 / -1; border-color: var(--ok); color: var(--ok); background: none; font-weight: 600; }
+  /* 14/11 (2º teste): cards sempre abertos; cor pelo status (🕓 pendente = claro, 🛵 saiu = escuro); mais espaço entre cards */
+  .en-cad { margin-top: 28px; }
+  .en-item { margin: 14px -16px; padding: 16px; border-bottom: 0; }
+  .en-item .cb-rota { right: 16px; }
+  /* 14/11 (3º ajuste): espaço claro entre as linhas de botões (💬 ↔ Saiu/Entregue ↔ número) e entre Saiu e Entregue */
+  .en-item .en-acoes { gap: 12px; margin-top: 14px; }
+  .en-item .en-acoes button { padding: 13px 4px; min-height: 46px; }
+  .en-item .cb-cel { margin-top: 16px; }
+  .en-item .cb-cel .cb-num { padding: 7px 14px; }
+  /* 15/11: 🕓 pendente = cor padrão do Telegram (fundo da página) com contorno; 🛵 saiu = cor secundária escura (preenchido) */
+  .en-acoes button.en-sel { grid-column: 1 / -1; }
+  .en-acoes button:disabled { opacity: .55; cursor: default; }
+  /* 15/11 (BOTOES_ETAPA): botão sozinho na linha ocupa a largura toda */
+  .en-acoes button.en-full { grid-column: 1 / -1; }
+  .en-item.saiu .en-chip { white-space: normal; max-width: 170px; text-align: right; }
+  .en-deve { font-size: 14px; margin-top: 12px; }   /* 14/11: bloco "quanto deve" no card da entrega */
+  .en-deve .rot:first-child { margin-top: 0; }
+  /* 15/11: folha 💰 Pagamento na entrega (abre no ✅ Entregue quando há valor a cobrar) */
+  .pg-folha { max-height: 92vh; overflow-y: auto; }
+  .pg-cobrar { font-size: 14px; margin-bottom: 12px; }
+  .pg-op { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .pg-op button, .pg-chips button { border: 1px solid transparent; background: var(--campo); color: var(--txt);
+    font: inherit; cursor: pointer; }
+  .pg-op button { padding: 13px 8px; border-radius: 12px; font-size: 15px; }
+  .pg-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+  .pg-chips button { padding: 8px 14px; border-radius: 999px; font-size: 14px; }
+  .pg-op button.on, .pg-chips button.on { background: var(--btn); color: var(--btn-txt); font-weight: 600; }
+  .pg-erro { color: var(--erro); font-size: 14px; font-weight: 600; margin-top: 10px; }
+  .pg-erro:empty { display: none; }
+  /* 17/11 (E7): 🗺️ Cobranças com pagamento — card tocável, modal com 3 opções, recibo no WhatsApp, ⏳ processando */
+  .cb-item.cb-toca { cursor: pointer; }
+  .cb-anotar { font-size: 13px; color: var(--dica); margin-top: 6px; }
+  .pg-op.tres { grid-template-columns: 1fr 1fr 1fr; }
+  .pg-op.tres button { font-size: 14px; padding: 12px 4px; }
+  .pg-recibo { text-align: center; margin-top: 14px; }
+  /* 18/11 (E8): conta na hora do "Pagou uma parte" + ✏️ WhatsApp do cliente no modal */
+  .pg-conta { margin-top: 10px; padding: 10px 12px; border-radius: 12px; background: var(--campo); font-size: 15px; }
+  .pg-conta div { display: flex; justify-content: space-between; gap: 10px; padding: 2px 0; }
+  .pg-conta b { font-variant-numeric: tabular-nums; }
+  .pg-conta .falta b { color: var(--erro); }
+  .pg-conta .maior { color: var(--erro); font-weight: 600; justify-content: center; padding-top: 6px; }
+  .pg-ok:disabled { opacity: .45; cursor: not-allowed; }
+  /* 18/11 (E8d): mesma conta na folha 💰 do ✅ Entregue, com a linha ─── antes do Falta */
+  .pg-conta.com-linha .falta, .pg-conta.com-linha .maior { border-top: 1px solid var(--dica); margin-top: 4px; padding-top: 6px; }
+  /* 18/11 (E8b): ✏️ pequeno ao lado de toda pílula do WhatsApp do cliente */
+  .cel-lapis { border: 0; background: transparent; font-size: 17px; line-height: 1; padding: 6px 2px 6px 8px; cursor: pointer; vertical-align: middle; }
+  .pg-cel { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: center; margin-top: 10px; text-align: left; }
+  .pg-cel label { width: 100%; margin: 0; }
+  .pg-cel input { flex: 1; min-width: 150px; }
+  .pg-cel button { border: 0; border-radius: 10px; padding: 10px 14px; font: 600 14px/1.2 inherit; cursor: pointer; }
+  .pg-cel .salvar { background: var(--btn); color: var(--btn-txt); }
+  .pg-cel .fechar { background: var(--campo); color: var(--txt); }
+  .pg-proc { text-align: center; font-size: 14px; color: var(--dica); padding: 14px 0 4px; }
+  .pg-ok { width: 100%; margin-top: 14px; padding: 13px; border: 0; border-radius: 12px; background: var(--btn);
+    color: var(--btn-txt); font: 600 16px/1.2 inherit; cursor: pointer; }
+  .en-item.pend { background: var(--bg); border-top: 1px solid color-mix(in srgb, var(--txt) 25%, transparent);
+                  border-bottom: 1px solid color-mix(in srgb, var(--txt) 25%, transparent); }
+  .en-item.saiu { background: var(--campo); border-top: 0; border-bottom: 0; }
+  /* 15/11 (teste visual, PEND_BRANCO): 🕓 pendente = fundo BRANCO nos dois temas, texto escuro, borda cinza fina; 🛵 saiu não muda.
+     Para voltar: apagar este bloco (backup index.html.bak-20261115-e37). */
+  .en-item.pend { --bg: #ffffff; --txt: #1b1b1b; --dica: #6b6b70; --campo: #ececf0;
+                  background: #ffffff; color: #1b1b1b; border: 1px solid #d4d4d9; }
+  .en-item.pend .en-acoes button:not(.zap) { background: #ececf0; border-color: #d4d4d9; color: #1b1b1b; }
+  /* 15/11 (EN_CHIP): status em pílula no canto superior direito, empilhado ACIMA do 🗺️ */
+  .en-canto { position: absolute; top: 12px; right: 16px; display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
+  .en-item .en-canto .cb-rota { position: static; }
+  .en-item .cb-nome, .en-item .en-ped { padding-right: 132px; }
+  /* 18/11 (E6c): novo topo do card — linha 1 nome + 💬 cliente; linha 2 pedido · data hora + 🗺️; linha 3 etiqueta + status.
+     Parte de cima fixa; área dos botões só com a altura dos botões que existem (sem buraco). */
+  .en-topo1, .en-topo2 { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+  .en-item .en-topo1 .cb-nome { padding-right: 0; flex: 1; min-width: 0; }
+  /* 18/11 (E6d): 🗺️ na linha do nome; linha em branco; "pedido · data hora" colado nos chips; 💬 volta ao canto inferior direito */
+  .en-item .en-topo1 .cb-rota { position: static; flex: none; padding: 2px 4px; }
+  .en-item .en-topo2 { margin-top: 1.2em; }
+  .en-item .en-topo2 .en-ped { margin-top: 0; padding-right: 0; flex: 1; min-width: 0; }
+  .en-topo3 { display: flex; gap: 8px; align-items: center; margin-top: 6px; }
+  .en-item .en-topo3 .en-eu { margin-left: 0; padding: 3px 10px; font-size: 12px; }
+  .en-item .en-acoes { min-height: 0; }
+  .en-chip { display: inline-block; padding: 3px 10px; border-radius: 999px; font-size: 12px; font-weight: 600; white-space: nowrap; }
+  .en-item.pend .en-chip { background: #eef0f3; color: #44464d; border: 1px solid #cfd1d7; }
+  .en-item.saiu .en-chip { background: color-mix(in srgb, var(--fixo) 18%, transparent); color: var(--fixo);
+                           border: 1px solid color-mix(in srgb, var(--fixo) 55%, transparent); }
+  /* 15/11: toque enviado há menos de 1 min e o estado ainda é o antigo → aviso + botões desativados */
+  .en-item.saiu .en-acoes button:not(.zap) { background: var(--bg); }
+  .cb-cancelar { width: 100%; margin-top: 12px; padding: 12px; border: 1px solid var(--dica); border-radius: 12px;
+                 background: none; color: var(--txt); font: inherit; font-size: 14px; cursor: pointer; }
+  .en-form-bts { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 12px; }
+  .en-form-bts .en-salvar, .en-form-bts .cb-cancelar { margin-top: 0; }
+  .en-lista-ent { display: grid; gap: 8px; }
+  .en-lista-ent button { padding: 12px; border: 0; border-radius: 12px; background: var(--campo); color: var(--txt);
+                         font: inherit; text-align: left; cursor: pointer; }
+  .en-lista-ent button.ultimo { background: var(--btn); color: var(--btn-txt); font-weight: 600; }
   /* 08/11 (Wellington): celular na Venda nova — verde = cadastrado, vermelho = atenção */
   #bloco-cel.cel-ok input { border: 1px solid var(--ok); }
   #bloco-cel.cel-ok .dica { color: var(--ok); }
@@ -120,7 +330,7 @@
 
 <script>
 const tg = window.Telegram && Telegram.WebApp;
-const TIPOS = ["venda", "cliente", "divida"];
+const TIPOS = ["venda", "cliente", "divida", "cobrancas", "entregas", "relatorio"];   // 13/11: 🗺️ Cobranças (só consulta); 14/11: 🚚 Entregas; 21/11 (E17): 📊 Relatório
 const tipo = TIPOS.includes(new URLSearchParams(location.search).get("tipo")) ? new URLSearchParams(location.search).get("tipo") : "venda";
 const $ = s => document.querySelector(s);
 const form = $("#form");
@@ -128,7 +338,9 @@ const form = $("#form");
 // Listas vêm no link do botão (depois do #, não chega a servidor nenhum): z = JSON compactado (deflate puro,
 // base64 url-safe) com p = produtos [id, nome, unidade, preço], c = clientes [id, nome, bairro], r = bairros [nome].
 // Sem listas, os campos ficam livres.
-let PRODUTOS = [], CLIENTES = [], BAIRROS = [];
+let PRODUTOS = [], CLIENTES = [], BAIRROS = [], FRETES = {};   // 13/11 (E1 🚚): f = {região: frete}
+let RELATORIO = null;   // 21/11 (E17 📊): v = {a: hoje ISO do motor, t: "DD/MM às HH:MM", d: [[dias antes de a, valor, nº pedidos]]}
+let ENTREGAS_LISTA = [], ENTREGADORES = [];   // 14/11 (E3 + E4 🚚): e = entregas abertas, g = entregadores ativos
 async function carregarListas() {
   try {
     const b = (new URLSearchParams(location.hash.slice(1)).get("z") || "").replace(/-/g, "+").replace(/_/g, "/");
@@ -136,11 +348,888 @@ async function carregarListas() {
     const bytes = Uint8Array.from(atob(b + "=".repeat((4 - b.length % 4) % 4)), c => c.charCodeAt(0));
     const fluxo = new Blob([bytes]).stream().pipeThrough(new DecompressionStream("deflate-raw"));
     const d = JSON.parse(await new Response(fluxo).text());
-    PRODUTOS = d.p || []; CLIENTES = d.c || []; BAIRROS = d.r || [];
+    PRODUTOS = d.p || []; CLIENTES = d.c || []; BAIRROS = d.r || []; FRETES = d.f || {};
+    ENTREGAS_LISTA = d.e || []; ENTREGADORES = d.g || [];
+    RELATORIO = d.v || null;   // 21/11 (E17 📊): soma por dia
   } catch (e) { /* sem listas: campos livres */ }
 }
 
 carregarListas().then(montar);
+// ---------- regra do celular (08/11), compartilhada (13/11) ----------
+// Celular = DDD + 9 + 8 dígitos (11); fixo de empresa (WhatsApp Business) = DDD + 8 dígitos (10). +55 aceito.
+// O formulário (erroCel/digitosCel) e a 🗺️ Cobranças usam ESTAS duas funções.
+const digitosNumero = v => { let d = String(v || "").replace(/\D/g, ""); if (d.length > 11 && d.startsWith("55")) d = d.slice(2); return d; };
+function erroNumeroCel(v) {
+  let d = String(v || "").replace(/\D/g, "");
+  if (!d) return "";   // celular é opcional
+  if (d.length > 11 && d.startsWith("55")) d = d.slice(2);
+  if (d.length === 8 || d.length === 9) return "Celular sem DDD: coloque o DDD antes, ex.: (00) 00000-0000.";
+  if (d.length === 11 && d[2] !== "9") return "Celular com 11 números precisa ter o 9 depois do DDD, ex.: (00) 90000-0000.";
+  if (d.length !== 10 && d.length !== 11) return "Número com quantidade errada: DDD + número (celular 11 dígitos, fixo 10).";
+  return "";
+}
+
+// ---------- rota + cópia + link (13/11; globais desde 14/11: 🗺️ Cobranças e 🚚 Entregas usam os mesmos) ----------
+// 17/11 (E5): nome de uma palavra já vem com o número ("Emily 0008"): não repete o código
+const nomeCod = (nome, cod) => { const n = String(nome || "").trim(); return cod && n.endsWith(" " + cod) ? n : (n + " " + cod).trim(); };
+const escHtml = t => String(t).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+// abrirRota(x): x = { nome, end, reg ("" = sem região), cep (só números) }
+function abrirLink(url) {
+  if (tg && tg.openLink && tg.platform && tg.platform !== "unknown") tg.openLink(url); else window.open(url, "_blank");
+}
+// 🗺️ Rota (13/11): escolha do app — Waze, Google Maps (de onde o vendedor está: sem origem = GPS),
+// copiar o endereço ou mandar no WhatsApp (sem número: o vendedor escolhe o contato). Nada é enviado sozinho.
+const CHAVE_APP = "cb_rota_app";
+const lerApp = () => { try { return localStorage.getItem(CHAVE_APP) || ""; } catch (e) { return ""; } };
+const guardarApp = a => { try { localStorage.setItem(CHAVE_APP, a); } catch (e) {} };
+function avisoCurto(txt) {
+  const el = document.createElement("div");
+  el.className = "cb-toast"; el.textContent = txt;
+  document.body.appendChild(el);
+  setTimeout(() => el.remove(), 1800);
+}
+function copiarTexto(txt) {
+  const reserva = () => {
+    const a = document.createElement("textarea");
+    a.value = txt; a.setAttribute("readonly", ""); a.style.position = "fixed"; a.style.opacity = "0";
+    document.body.appendChild(a); a.select();
+    let ok = false; try { ok = document.execCommand("copy"); } catch (e) {}
+    a.remove(); return ok;
+  };
+  const fim = ok => avisoCurto(ok ? "Endereço copiado" : "Não deu para copiar");
+  if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(txt).then(() => fim(true), () => fim(reserva()));
+  else fim(reserva());
+}
+function abrirRota(x, comCancelar) {   // 14/11: comCancelar = botão "✕ Cancelar" embaixo (🚚 Entregas)
+  if (!x || (!x.end && !x.cep)) return;
+  const cep = x.cep.length === 8 ? x.cep.slice(0, 5) + "-" + x.cep.slice(5) : x.cep;
+  const destino = [x.end, x.reg, cep].filter(Boolean).join(", ");   // o mesmo de antes
+  const d = encodeURIComponent(destino);
+  const maps = `https://www.google.com/maps/dir/?api=1&destination=${d}`;
+  const acoes = {
+    waze: () => abrirLink(`https://waze.com/ul?q=${d}&navigate=yes`),
+    maps: () => abrirLink(maps),
+    copiar: () => copiarTexto(destino),
+    // 13/11: copia o endereço DENTRO do toque (antes de abrir o WhatsApp); se a cópia falhar, abre igual
+    whats: () => { try { copiarTexto(destino); } catch (e) {} abrirLink(`https://wa.me/?text=${encodeURIComponent(`📍 ${x.nome}\n${destino}\n${maps}`)}`); },
+  };
+  const ult = lerApp();
+  const bt = (k, txt) => `<button type="button" data-app="${k}"${k === ult ? ' class="ultimo"' : ""}>${txt}</button>`;
+  const fundo = document.createElement("div");
+  fundo.className = "cb-fundo";
+  fundo.innerHTML = `<div class="cb-folha" role="dialog" aria-label="Rota até ${escHtml(x.nome)}">
+    <div class="cb-folha-topo"><b>🗺️ Rota até ${escHtml(x.nome)}</b><button type="button" class="cb-folha-x" aria-label="Fechar">✕</button></div>
+    <div class="cb-apps">${bt("waze", "🚗 Waze")}${bt("maps", "📍 Google Maps")}${bt("copiar", "📋 Copiar endereço")}${bt("whats", "💬 Mandar no WhatsApp")}</div>${comCancelar ? '<button type="button" class="cb-cancelar">✕ Cancelar</button>' : ""}</div>`;
+  const fechar = () => fundo.remove();
+  fundo.onclick = e => { if (e.target === fundo) fechar(); };
+  fundo.querySelector(".cb-folha-x").onclick = fechar;
+  if (comCancelar) fundo.querySelector(".cb-cancelar").onclick = fechar;
+  fundo.querySelectorAll("[data-app]").forEach(b => b.onclick = () => { guardarApp(b.dataset.app); fechar(); acoes[b.dataset.app](); });
+  document.body.appendChild(fundo);
+}
+
+// ---------- 🗺️ Cobranças por região (13/11, C045 + C116/I033) ----------
+// Só consulta: sem Enviar, não grava e não manda nada ao bot. Dados no link do botão:
+// c = [id, nome, região, celular, talão, vendas em aberto, talão vencido "DD/MM/AAAA", cobrança do talão,
+//      cobrança das vendas, horário dela, venda vencida (1/0), horário do talão]; r = regiões.
+// 14/11: pílula do WhatsApp do cliente — a mesma na 🗺️ Cobranças e na 🚚 Entregas.
+// Verde = celular (abre), laranja = fixo (abre), vermelho = errado, laranja "⚠️ ✖ sem número". attrs = data-* do botão.
+function pilulaCel(v, attrs, rotulo) {
+  const esc = escHtml, d = digitosNumero(v);
+  const mostraNum = d => d.length < 3 ? d : `(${d.slice(0, 2)}) ` + (d.length - 2 > 4 ? d.slice(2, d.length - 2 >= 9 ? 7 : 6) + "-" + d.slice(d.length - 2 >= 9 ? 7 : 6) : d.slice(2));
+  if (!d) return `<span class="cb-num fixo">⚠️ ✖ sem número</span>`;
+  if (erroNumeroCel(v)) return `<span class="cb-num erro">⚠️ ${esc(mostraNum(d))}</span>`;
+  const fixo = d.length === 10;
+  const fmt = fixo ? `(${d.slice(0, 2)}) ${d.slice(2, 6)}-${d.slice(6)}` : `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`;
+  return `<button type="button" class="cb-num ${fixo ? "fixo" : "ok"}" ${attrs} aria-label="${esc(rotulo)}">${fixo ? "☎️" : "💬"} ${esc(fmt)} ›</button>`;
+}
+
+// 17/11 (E7): recibo pronto para o WhatsApp do cliente — o Wellington é quem envia (o bot não manda nada).
+// rec = recebido agora; falta = o que continua devendo; dIso/hora = próxima cobrança; ped = pedido (folha do ✅ Entregue).
+function reciboTexto(nome, rec, forma, falta, dIso, hora, ped) {
+  const rs = n => "R$ " + Number(n).toFixed(2).replace(".", ",").replace(/\B(?=(\d{3})+,)/g, ".");
+  const dm = iso => iso ? iso.slice(8, 10) + "/" + iso.slice(5, 7) : "";
+  const d = new Date(), hojeDM = String(d.getDate()).padStart(2, "0") + "/" + String(d.getMonth() + 1).padStart(2, "0");
+  const n = String(nome || "").trim().split(/\s+/)[0];
+  const prox = `${dm(dIso)}${hora ? " às " + hora : ""}`;
+  if (!(rec > 0)) return `Olá, ${n}! Combinado: o pagamento de ${rs(falta)}${ped ? ` (pedido ${ped})` : ""} fica para ${prox}. Obrigado! 😊`;
+  return `Olá, ${n}! Recebemos ${rs(rec)} no ${forma} em ${hojeDM}${ped ? ` (pedido ${ped})` : ""}.`
+    + (falta > 0.005 ? ` Restante: ${rs(falta)}, próxima cobrança ${prox}.` : " Tudo quitado. Obrigado! 😊");
+}
+// pílula verde "💬 Recibo no WhatsApp" (mesmo estilo do número); sem celular válido = desligada "✖ sem número"
+function pilulaRecibo(cel) {
+  const d = digitosNumero(cel);
+  if (!d || erroNumeroCel(cel)) return `<span class="cb-num fixo">⚠️ ✖ sem número</span>`;
+  return `<button type="button" class="cb-num ok" data-recibo="1">💬 Recibo no WhatsApp ›</button>`;
+}
+// 18/11 (E8b): ✏️ WhatsApp do cliente (🗺️ Cobranças, cards da 🚚 Entregas, folha do ✅ Entregue).
+// O número salvo vale neste aparelho por 1 h (até os botões novos chegarem com ele) e SUBSTITUI o do link.
+const CEL_KEY = "cb_cel_salvo", CEL_MS = 3600e3;
+function celSalvo(id) {
+  try { const m = JSON.parse(localStorage.getItem(CEL_KEY) || "{}") || {}, r = m[id];
+    return r && Date.now() - r.t < CEL_MS ? r.cel : ""; } catch (e) { return ""; }
+}
+function guardarCel(id, cel) {
+  try { const m = JSON.parse(localStorage.getItem(CEL_KEY) || "{}") || {}, ag = Date.now();
+    for (const k in m) if (!(ag - m[k].t < CEL_MS)) delete m[k];
+    m[id] = { cel, t: ag }; localStorage.setItem(CEL_KEY, JSON.stringify(m)); } catch (e) {}
+}
+const fmtCelCli = d => d.length === 10 ? `(${d.slice(0, 2)}) ${d.slice(2, 6)}-${d.slice(6)}` : `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`;
+const lapisCel = attrs => `<button type="button" class="cel-lapis" ${attrs} aria-label="Editar o WhatsApp do cliente">✏️</button>`;
+function mandarBot(txt) {
+  if (tg && tg.platform && tg.platform !== "unknown") { tg.sendData(txt); return; }   // fecha a janela e manda ao bot
+  $("#saida").hidden = false; $("#saida").textContent = txt;                           // fora do Telegram: só mostra
+}
+// campo "📱 WhatsApp do cliente" já preenchido com o número atual + [Salvar] [✕]. salvar(d) recebe os dígitos (sem 55).
+function campoCel(caixa, atual, salvar, fechar, erro) {
+  const d0 = digitosNumero(atual);
+  caixa.innerHTML = `<div class="pg-cel"><label>📱 WhatsApp do cliente</label>
+    <input type="tel" inputmode="numeric" maxlength="15" placeholder="(__) _____-____" autocomplete="off" value="${d0 ? fmtCelCli(d0) : ""}">
+    <button type="button" class="salvar">Salvar</button><button type="button" class="fechar" aria-label="Fechar">✕</button></div>`;
+  const inp = caixa.querySelector("input");
+  inp.oninput = () => { const d = inp.value.replace(/\D/g, "").slice(0, 11);
+    inp.value = d.length > 7 ? `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}` : d.length > 2 ? `(${d.slice(0, 2)}) ${d.slice(2)}` : d; erro(""); };
+  caixa.querySelector(".fechar").onclick = () => { erro(""); fechar(); };
+  caixa.querySelector(".salvar").onclick = () => {
+    const d = digitosNumero(inp.value);
+    if (!d) { erro("Coloque o WhatsApp com DDD: (00) 90000-0000."); inp.focus(); return; }
+    const e = erroNumeroCel(d); if (e) { erro(e); inp.focus(); return; }
+    if (d === d0) { erro("É o mesmo número de agora."); inp.focus(); return; }
+    erro(""); salvar(d);
+  };
+  inp.focus();
+}
+// ✏️ fora de um pagamento (cards): folha só do número; Salvar grava SÓ o celular (📱 WHATSAPP → cliente-celular)
+function folhaCel(id, nome, atual, depois) {
+  const fundo = document.createElement("div");
+  fundo.className = "cb-fundo";
+  fundo.innerHTML = `<div class="cb-folha pg-folha" role="dialog" aria-label="WhatsApp do cliente">
+    <div class="cb-folha-topo"><b>📱 ${escHtml(nome)}</b><button type="button" class="cb-folha-x" aria-label="Fechar">✕</button></div>
+    <div class="pg-recibo" id="fc_caixa"></div><div class="pg-erro" id="fc_erro"></div></div>`;
+  const fechar = () => fundo.remove();
+  fundo.onclick = e => { if (e.target === fundo) fechar(); };
+  fundo.querySelector(".cb-folha-x").onclick = fechar;
+  document.body.appendChild(fundo);
+  campoCel(fundo.querySelector("#fc_caixa"), atual, d => {
+    guardarCel(id, d); fechar(); if (depois) depois(d);
+    mandarBot(`📱 WHATSAPP ${id}: ${d}`);
+  }, fechar, t => { fundo.querySelector("#fc_erro").textContent = t; });
+}
+// 18/11 (E8c): valor digitado em reais, lido a cada tecla (🗺️ Cobranças e folha do ✅ Entregue).
+// Aceita "430", "430,", "430,5", "430,50", "430.50", "1.234,56", "1.234" e "R$ 430,00". Inválido = NaN.
+function lerValorBR(s) {
+  s = String(s || "").trim().replace(/^R\$\s*/i, "").replace(/\s/g, ""); if (!s) return NaN;
+  if (s.includes(",")) s = s.replace(/\./g, "").replace(",", ".");          // vírgula = decimal; ponto = milhar
+  else if (/^\d{1,3}(\.\d{3})+$/.test(s)) s = s.replace(/\./g, "");       // "1.234" = mil duzentos e trinta e quatro
+  return /^\d+(\.\d{0,2})?$/.test(s) ? Number(s.replace(/\.$/, "")) : NaN;
+}
+function abrirRecibo(cel, texto) {
+  let d = digitosNumero(cel); if (d.length > 11 && d.startsWith("55")) d = d.slice(2);
+  if (d) abrirLink(`https://wa.me/55${d}?text=${encodeURIComponent(texto)}`);
+}
+
+function montarCobrancas() {
+  const esc = t => String(t).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+  const reais = n => "R$ " + n.toFixed(2).replace(".", ",").replace(/\B(?=(\d{3})+,)/g, ".");
+  const sem = t => (t || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+  const SEM_REG = "__sem";
+  const dataISO = s => { const m = /^(\d{2})\/(\d{2})\/(\d{4})/.exec(String(s || "")); return m ? `${m[3]}-${m[2]}-${m[1]}` : ""; };
+  const d0 = new Date(); d0.setMinutes(d0.getMinutes() - d0.getTimezoneOffset());
+  const hoje = d0.toISOString().slice(0, 10);
+  const ddmm = iso => iso.slice(8, 10) + "/" + iso.slice(5, 7);
+  const cel = v => {
+    let d = String(v || "").replace(/\D/g, "");
+    if (d.length > 11 && d.startsWith("55")) d = d.slice(2);
+    return d.length === 11 ? `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`
+      : d.length === 10 ? `(${d.slice(0, 2)}) ${d.slice(2, 6)}-${d.slice(6)}` : d;
+  };
+  // Data da cobrança = a mais próxima entre venda e talão; vencida tem prioridade (a mais antiga)
+  const devedores = CLIENTES.map(c => {
+    const talao = Number(c[4]) || 0, aberto = Number(c[5]) || 0, total = Math.round((talao + aberto) * 100) / 100;
+    const ds = [];
+    if (talao > 0) { const d = dataISO(c[6]) || dataISO(c[7]); if (d) ds.push({ d, h: c[11] || "", venc: !!c[6] || d < hoje }); }
+    if (aberto > 0) { const d = dataISO(c[8]); if (d) ds.push({ d, h: c[9] || "", venc: c[10] === 1 || d < hoje }); }
+    const venc = ds.filter(x => x.venc).sort((a, b) => a.d.localeCompare(b.d));
+    const outras = ds.filter(x => !x.venc).sort((a, b) => a.d.localeCompare(b.d));
+    const cob = venc[0] || outras[0] || null;
+    return { id: c[0], nome: c[1], reg: c[2] || SEM_REG, cel: celSalvo(c[0]) || c[3], talao, aberto, total, cob, ordem: cob ? (cob.venc ? 0 : 1) : 2,
+             end: String(c[12] || "").trim(), cep: String(c[13] || "").replace(/\D/g, "") };   // 13/11: 13º/14º = endereço, CEP
+  }).filter(x => x.total > 0.004);   // só quem deve (talão + vendas em aberto)
+  const regioes = [...BAIRROS];
+  devedores.forEach(x => { if (x.reg !== SEM_REG && !regioes.includes(x.reg)) regioes.push(x.reg); });
+  regioes.sort((a, b) => sem(a).localeCompare(sem(b)));
+  const temSem = CLIENTES.some(c => !c[2]);
+  // 13/11: o número vira o botão. Verde = celular (abre), laranja = fixo (abre), vermelho = errado, laranja "✖ sem número".
+  const pilula = x => pilulaCel(x.cel, `data-id="${esc(x.id)}"`, "Cobrar no WhatsApp");   // 14/11: função global
+  // v2: nome + código → 💸 total → data → 🛒 vendas em aberto → 📒 talão → número (à direita)
+  const linha = x => {
+    const cod = String(x.id).replace(/\D/g, "").slice(-4);
+    const quando = !x.cob ? `<div class="cb-li">sem data de cobrança</div>`
+      : x.cob.venc ? `<div class="cb-li atraso">⚠️ venceu ${ddmm(x.cob.d)}</div>`
+      : `<div class="cb-li">📆 cobrança ${ddmm(x.cob.d)}${x.cob.h ? " " + esc(x.cob.h) : ""}</div>`;
+    const rota = x.end || x.cep
+      ? `<button type="button" class="cb-rota" data-rota="${esc(x.id)}" aria-label="Rota até o cliente">🗺️</button>`
+      : `<span class="cb-rota off" aria-label="Sem endereço">🗺️</span>`;
+    // 17/11 (E7): tocar no card abre o 💰 pagamento; logo depois de confirmar fica "⏳ processando…" (60 s)
+    const proc = toqueCob(x.id) > 0;
+    return `<div class="cb-item cb-toca" data-pg="${esc(x.id)}">${rota}<div class="cb-nome">${esc(nomeCod(x.nome, cod))}</div>`
+      + `<div class="cb-li">💸 ${reais(x.total)}</div>` + quando
+      + (x.aberto > 0 ? `<div class="cb-li">🛒 Débitos em aberto: ${reais(x.aberto)}</div>` : "")
+      + (x.talao > 0 ? `<div class="cb-li">📒 Talão: ${reais(x.talao)}</div>` : "")
+      + (proc ? `<div class="cb-anotar">⏳ processando…</div>` : `<div class="cb-anotar">💰 Toque para anotar pagamento</div>`)
+      + `<div class="cb-cel">${pilula(x)}${lapisCel(`data-lapis="${esc(x.id)}"`)}</div></div>`;   // 18/11 (E8b): + ✏️
+  };
+  const ordenar = l => l.sort((a, b) => a.ordem - b.ordem || (a.cob && b.cob ? a.cob.d.localeCompare(b.cob.d) : 0) || sem(a.nome).localeCompare(sem(b.nome)));
+  const soma = l => Math.round(l.reduce((s, x) => s + x.total, 0) * 100) / 100;
+  const bloco = (reg, l) => `<div class="cb-reg"><span>📍 ${esc(reg === SEM_REG ? "Sem região" : reg)}</span><b>${reais(soma(l))}</b></div>` + ordenar(l).map(linha).join("");
+  // 📲 Cobrar (13/11): abre o WhatsApp do vendedor na conversa do cliente com a mensagem pronta; NÃO envia sozinho.
+  // I035 (futuro): trocar SÓ esta função para pedir o envio ao agente do WhatsApp.
+  function cobrarWhatsApp(x) {
+    let d = String(x.cel || "").replace(/\D/g, "");
+    if (d.length > 11 && d.startsWith("55")) d = d.slice(2);
+    if (!d) return;
+    const nome = String(x.nome).trim().split(/\s+/)[0];
+    const fim = " Qualquer dúvida, estou à disposição. 😊";
+    const msg = !x.cob ? `Olá, ${nome}! Passando para lembrar do valor em aberto de ${reais(x.total)}.${fim}`
+      : x.cob.venc ? `Olá, ${nome}! Passando para lembrar da cobrança de ${reais(x.total)}, que venceu em ${ddmm(x.cob.d)}.${fim}`
+      : `Olá, ${nome}! Passando para lembrar da cobrança de ${reais(x.total)}, combinada para ${ddmm(x.cob.d)}.${fim}`;
+    abrirLink(`https://wa.me/55${d}?text=${encodeURIComponent(msg)}`);
+  }
+  // 17/11 (E7): lembra o último pagamento confirmado por 60 s neste aparelho (a página fecha ao gravar)
+  const TOQUE_COB = "cb_toque_cob", TOQUE_MS = 60000;
+  function toqueCob(id) {
+    try { const m = JSON.parse(localStorage.getItem(TOQUE_COB) || "{}") || {}; const f = TOQUE_MS - (Date.now() - (m[id] || 0));
+      return f > 0 && f <= TOQUE_MS ? f : 0; } catch (e) { return 0; }
+  }
+  function guardarCob(id) {
+    try { const m = JSON.parse(localStorage.getItem(TOQUE_COB) || "{}") || {}, ag = Date.now();
+      for (const k in m) if (!(ag - m[k] < TOQUE_MS)) delete m[k];
+      m[id] = ag; localStorage.setItem(TOQUE_COB, JSON.stringify(m)); } catch (e) {}
+  }
+  // 💰 modal do pagamento (mesmo jeito da folha 💰 Pagamento do ✅ Entregue). Ele é a confirmação: grava direto.
+  // Regra do motor (`pagamento`): abate primeiro o talão, depois as vendas da mais antiga para a mais nova.
+  const FORMAS = [["dinheiro", "💵 Dinheiro"], ["pix", "⚡ Pix"], ["cartão", "💳 Cartão"]];
+  const HORAS = []; for (let m = 8 * 60; m <= 20 * 60; m += 30) HORAS.push(String(Math.floor(m / 60)).padStart(2, "0") + ":" + String(m % 60).padStart(2, "0"));
+  const virgula = n => Number(n).toFixed(2).replace(".", ",");
+  const lerValor = lerValorBR;   // 18/11 (E8c): aceita o valor enquanto digita ("430," = 430)
+  function pagamento(x) {
+    if (!x || toqueCob(x.id)) return;
+    const cod = String(x.id).replace(/\D/g, "").slice(-4);
+    const fundo = document.createElement("div");
+    fundo.className = "cb-fundo";
+    fundo.innerHTML = `<div class="cb-folha pg-folha" role="dialog" aria-label="Pagamento">
+      <div class="cb-folha-topo"><b>💰 ${esc(nomeCod(x.nome, cod))} · deve ${reais(x.total)}</b><button type="button" class="cb-folha-x" aria-label="Fechar">✕</button></div>
+      <div class="pg-cobrar">${x.talao > 0 ? `📒 Talão: <b>${reais(x.talao)}</b>${x.aberto > 0 ? " · " : ""}` : ""}${x.aberto > 0 ? `🛒 Vendas: <b>${reais(x.aberto)}</b>` : ""}</div>
+      <div class="pg-op tres"><button type="button" data-op="tudo">✅ Pagou tudo</button><button type="button" data-op="parte">💵 Pagou uma parte</button><button type="button" data-op="nao">⏳ Não pagou</button></div>
+      <div id="pg_rec" hidden><label for="pg_valor">Valor recebido *</label>
+        <input id="pg_valor" type="text" inputmode="decimal" value="${virgula(x.total)}">
+        <div class="pg-conta" id="pg_conta" hidden></div>
+        <label>Forma *</label><div class="pg-chips" data-g="forma">${FORMAS.map(([v, r]) => `<button type="button" data-v="${esc(v)}">${esc(r)}</button>`).join("")}</div></div>
+      <div id="pg_falta" hidden><div class="dupla"><div><label for="pg_data">📆 Próxima cobrança *</label><input id="pg_data" type="date" min="${hoje}"></div>
+        <div><label for="pg_hora">Horário</label><select id="pg_hora"><option value="">— (sem horário)</option>${HORAS.map(h => `<option>${h}</option>`).join("")}</select></div></div></div>
+      <div id="pg_obs_caixa" hidden><label for="pg_obs">📝 Observação (opcional)</label>
+        <textarea id="pg_obs" maxlength="200" placeholder="ex.: pagou na feira"></textarea></div>
+      <div class="pg-erro" id="pg_erro"></div>
+      <div class="pg-recibo" id="pg_recibo" hidden></div>
+      <div id="pg_botoes"><button type="button" class="pg-ok" id="pg_ok" hidden>✅ Confirmar</button>
+      <button type="button" class="cb-cancelar" data-cancelar="1">✕ Cancelar</button></div></div>`;
+    const $f = s => fundo.querySelector(s);
+    let op = "", forma = "", enviado = false, celNovo = "";
+    // 18/11 (E8): número salvo pelo ✏️ e ainda não mandado vai ao bot mesmo se fechar sem confirmar o pagamento
+    const fechar = () => { if (enviado) return;
+      if (celNovo) { enviado = true; const txt = `📱 WHATSAPP ${x.id}: ${celNovo}`;
+        if (tg && tg.platform && tg.platform !== "unknown") { tg.sendData(txt); return; }
+        $("#saida").hidden = false; $("#saida").textContent = txt; }
+      fundo.remove(); };
+    const erro = t => { $f("#pg_erro").textContent = t; };
+    // 18/11 (E8): "Pagou uma parte" — Deve / Recebido / Falta a cada número digitado (só na tela, não grava)
+    const conta = () => {
+      const c = $f("#pg_conta"), ok = $f("#pg_ok");
+      if (op !== "parte") { c.hidden = true; ok.disabled = false; return; }
+      const v = lerValor($f("#pg_valor").value), rec = v > 0 ? v : 0, maior = rec > x.total + 0.005;
+      c.hidden = false; ok.disabled = maior;
+      c.innerHTML = `<div><span>Deve:</span><b>${reais(x.total)}</b></div><div><span>Recebido:</span><b>${reais(rec)}</b></div>`
+        + (maior ? `<div class="maior">⚠️ maior que a dívida</div>`
+                 : `<div class="falta"><span>Falta:</span><b>${reais(Math.round((x.total - rec) * 100) / 100)}</b></div>`);
+    };
+    // 18/11 (E8): pílula do recibo; sem número = "⚠️ ✖ sem número ✏️" (toque abre o campo do WhatsApp)
+    // 18/11 (E8b): pílula + ✏️ sempre (sem número: [✖ sem número] ✏️; salvo agora: 💬 com o número novo)
+    const recibo = () => {
+      const r = $f("#pg_recibo"), d = digitosNumero(x.cel);
+      r.innerHTML = (celNovo ? `<button type="button" class="cb-num ok" data-recibo="1">💬 ${fmtCelCli(d)} ›</button>` : pilulaRecibo(x.cel))
+        + lapisCel('data-editcel="1"');
+      const rb = r.querySelector("[data-recibo]");
+      if (rb) rb.onclick = () => { const v = validar(); if (v) abrirRecibo(x.cel, reciboTexto(x.nome, v.rec, forma, v.falta, v.dIso, v.hora)); };
+      const eb = r.querySelector("[data-editcel]");
+      if (eb) eb.onclick = editarCel;
+    };
+    function editarCel() {
+      campoCel($f("#pg_recibo"), x.cel, d => { celNovo = d; x.cel = d; guardarCel(x.id, d); recibo(); }, recibo, erro);
+    }
+    const atualizar = () => {
+      fundo.querySelectorAll("[data-op]").forEach(b => b.classList.toggle("on", b.dataset.op === op));
+      $f("#pg_rec").hidden = !(op === "tudo" || op === "parte");
+      $f("#pg_valor").disabled = op === "tudo";
+      if (op === "tudo") $f("#pg_valor").value = virgula(x.total);
+      $f("#pg_falta").hidden = !(op === "parte" || op === "nao");
+      $f("#pg_obs_caixa").hidden = $f("#pg_ok").hidden = $f("#pg_recibo").hidden = !op;
+      fundo.querySelectorAll("input[type=date], select").forEach(el => el.classList.toggle("vazio", !el.value));
+      conta();
+    };
+    // confere tudo; devolve o pagamento ou null (com a frase do erro)
+    const validar = () => {
+      if (!op) { erro("Escolha: pagou tudo, uma parte ou não pagou."); return null; }
+      const rec = op === "tudo" ? x.total : op === "parte" ? lerValor($f("#pg_valor").value) : 0;
+      if (op === "parte") {
+        if (!(rec > 0)) { erro("Informe o valor recebido (ou toque em ⏳ Não pagou)."); $f("#pg_valor").focus(); return null; }
+        if (rec > x.total - 0.005) { erro(rec > x.total + 0.005 ? `O valor passa do que deve (${reais(x.total)}).` : "É o total: toque em ✅ Pagou tudo."); return null; }
+      }
+      if (rec > 0 && !forma) { erro("Escolha a forma: dinheiro, pix ou cartão."); return null; }
+      const falta = Math.round((x.total - rec) * 100) / 100, dIso = $f("#pg_data").value, hora = $f("#pg_hora").value;
+      if (falta > 0.005) {
+        if (!dIso) { erro("Escolha a data da próxima cobrança."); $f("#pg_data").focus(); return null; }
+        if (dIso < hoje) { erro("A data da próxima cobrança já passou."); return null; }
+      }
+      return { rec, falta, dIso: falta > 0.005 ? dIso : "", hora: falta > 0.005 ? hora : "", obs: $f("#pg_obs").value.replace(/\s+/g, " ").trim() };
+    };
+    fundo.onclick = e => { if (e.target === fundo) fechar(); };
+    $f(".cb-folha-x").onclick = fechar;
+    $f("[data-cancelar]").onclick = fechar;
+    // "Pagou uma parte" abre com o valor vazio (o total é o "Pagou tudo")
+    fundo.querySelectorAll("[data-op]").forEach(b => b.onclick = () => { op = b.dataset.op; erro("");
+      if (op === "parte") { $f("#pg_valor").value = ""; atualizar(); $f("#pg_valor").focus(); } else atualizar(); });
+    fundo.querySelectorAll(".pg-chips button").forEach(b => b.onclick = () => {
+      fundo.querySelectorAll(".pg-chips button").forEach(o => o.classList.toggle("on", o === b)); forma = b.dataset.v; erro(""); });
+    $f("#pg_valor").oninput = () => { erro(""); conta(); };
+    $f("#pg_data").onchange = $f("#pg_hora").onchange = () => { erro(""); atualizar(); };
+    recibo();
+    $f("#pg_ok").onclick = () => {
+      const v = validar(); if (!v) return;
+      const partes = [`💰 PAGAMENTO ${x.id}: recebeu ${virgula(v.rec)}${v.rec > 0 ? " no " + forma : ""}`];
+      if (v.falta > 0.005) partes.push(`cobrança: ${v.dIso.split("-").reverse().join("/")}${v.hora ? " " + v.hora : ""}`);
+      if (v.obs) partes.push(`obs: ${v.obs}`);
+      if (celNovo) partes.push(`whatsapp: ${celNovo}`);   // 18/11 (E8): grava o número junto (pagamento --celular)
+      enviado = true; guardarCob(x.id);
+      $f("#pg_botoes").innerHTML = `<div class="pg-proc">⏳ processando…</div>`;   // botão some (igual às Entregas)
+      const txt = partes.join(" · ");
+      if (tg && tg.platform && tg.platform !== "unknown") { tg.sendData(txt); return; }   // fecha a janela e manda ao bot
+      $("#saida").hidden = false; $("#saida").textContent = txt;                       // fora do Telegram: só mostra
+    };
+    document.body.appendChild(fundo);
+    atualizar();
+  }
+  function mostrar() {
+    const esc_ = $("#cb_regiao").value, el = $("#cb_lista"), q = sem($("#cb_busca").value.trim());
+    setTimeout(() => {
+      el.querySelectorAll(".cb-item[data-pg]").forEach(c => c.onclick = e => {
+        if (e.target.closest("button, a")) return;   // 🗺️ e o número continuam com a função deles
+        pagamento(devedores.find(x => x.id === c.dataset.pg));
+      });
+      el.querySelectorAll("button.cb-num[data-id]").forEach(b => b.onclick = () => cobrarWhatsApp(devedores.find(x => x.id === b.dataset.id)));
+      el.querySelectorAll("button.cel-lapis[data-lapis]").forEach(b => b.onclick = () => {   // 18/11 (E8b): grava só o número
+        const x = devedores.find(x => x.id === b.dataset.lapis);
+        folhaCel(x.id, x.nome, x.cel, d => { x.cel = d; mostrar(); });
+      });
+      el.querySelectorAll("button.cb-rota[data-rota]").forEach(b => b.onclick = () => {
+        const x = devedores.find(x => x.id === b.dataset.rota);
+        abrirRota(x && { ...x, reg: x.reg === SEM_REG ? "" : x.reg });
+      });
+    }, 0);
+    const vale = x => (!esc_ || x.reg === esc_) && (!q || sem(x.nome).includes(q));   // v2: busca vale junto com a região
+    const lista = devedores.filter(vale);
+    if (!lista.length) {
+      el.innerHTML = q ? `<div class="cb-nada">Nenhum cliente encontrado.</div>` : `<div class="cb-vazio">✅ Ninguém devendo nesta região.</div>`;
+      return;
+    }
+    if (esc_) { el.innerHTML = bloco(esc_, lista) + `<div class="cb-total">Total da região: ${reais(soma(lista))}</div>`; return; }
+    const grupos = [...regioes, SEM_REG].map(r => [r, lista.filter(x => x.reg === r)]).filter(([, l]) => l.length);   // região sem resultado some
+    el.innerHTML = grupos.map(([r, l]) => bloco(r, l)).join("") + `<div class="cb-total">Total geral: ${reais(soma(lista))}</div>`;
+  }
+  $("#titulo").textContent = "🗺️ Cobranças";
+  document.querySelector(".sub").textContent = "Toque no cliente para anotar o pagamento (grava direto).";   // 17/11 (E7)
+  $("#enviar").remove();
+  form.innerHTML = `<div class="cb-busca"><input id="cb_busca" type="search" placeholder="🔍 Buscar cliente pelo nome…" autocomplete="off"></div>`
+    + `<label for="cb_regiao">Região</label><select id="cb_regiao"><option value="">Todas as regiões</option>`
+    + regioes.map(r => `<option value="${esc(r)}">${esc(r)}</option>`).join("")
+    + (temSem ? `<option value="${SEM_REG}">Sem região</option>` : "") + `</select><div id="cb_lista"></div>`;
+  $("#cb_regiao").onchange = mostrar;
+  $("#cb_busca").oninput = mostrar;
+  mostrar();
+  if (tg) { tg.ready(); tg.expand(); }
+}
+
+// ---------- 🚚 Entregas (14/11, E3 + E4) — interno: vendedor / ponto fixo ----------
+// O motoboy só usa o WhatsApp: recebe 1 mensagem pronta (💬), toca no link e responde "saí"/"entreguei".
+// Dados no link do botão: e = [pedido, cliente, nome, celular, região, endereço, referência, CEP, a cobrar,
+// saiu (0/1), hora da saída, entregador]; g = [id, nome, celular]. Entregue some da lista (o vigia reenvia os botões).
+// 🛵 Saiu / ✅ Entregue / ↩️ mandam uma linha curta ao bot, que grava direto (sem prévia).
+function montarEntregas() {
+  const esc = escHtml;
+  const reais = n => "R$ " + Number(n).toFixed(2).replace(".", ",").replace(/\B(?=(\d{3})+,)/g, ".");
+  const fmtCel = v => { const d = digitosNumero(v);
+    return d.length === 11 ? `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}` : d.length === 10 ? `(${d.slice(0, 2)}) ${d.slice(2, 6)}-${d.slice(6)}` : d; };
+  const cepFmt = c => c.length === 8 ? c.slice(0, 5) + "-" + c.slice(5) : c;
+  const nomeEnt = id => (ENTREGADORES.find(g => g[0] === id) || [])[1] || id;
+  // quem o vendedor escolheu no 💬 (por pedido, só neste aparelho) vale para o 🛵 Saiu
+  const CHAVE = "cb_ent_";
+  const lerEsc = p => { try { return localStorage.getItem(CHAVE + p) || ""; } catch (e) { return ""; } };
+  const guardarEsc = (p, id) => { try { localStorage.setItem(CHAVE + p, id); localStorage.setItem(CHAVE + "ultimo", id); } catch (e) {} };
+  const lista = ENTREGAS_LISTA.map(e => ({ ped: e[0], cli: e[1], nome: e[2], cel: celSalvo(e[1]) || e[3], reg: e[4] || "", end: e[5] || "",
+    ref: e[6] || "", cep: String(e[7] || ""), cobrar: Number(e[8]) || 0, saiu: e[9] === 1, saida: e[10] || "", ent: e[11] === "@" ? "" : e[11] || "", eu: e[11] === "@",
+    // 14/11: 13º-16º = deve no total, débitos em aberto (inclui esta entrega), talão, situação do talão (só se deve além desta entrega)
+    hora: e[16] || "", frete: Number(e[17]) || 0, recado: String(e[18] || ""),   // 20/11 (E14 📝)
+    deve: e[12] != null ? { total: Number(e[12]) || 0, aberto: Number(e[13]) || 0, talao: Number(e[14]) || 0, tsit: String(e[15] || "") } : null }));
+  // 17/11 (E2): o entregador pode vir da Venda nova (planilha). Antes do 🛵 Saiu, a escolha feita no card vale mais
+  // (inclusive "-" = removido no card). Depois do Saiu vale o da planilha. Eu entrego não tem entregador.
+  const valido = id => ENTREGADORES.some(g => g[0] === id);
+  const entDe = x => {
+    if (x.eu) return "";
+    const l = lerEsc(x.ped);
+    if (x.saiu) return x.ent || (valido(l) ? l : "");
+    if (l === "-") return "";
+    return valido(l) ? l : valido(x.ent) ? x.ent : "";
+  };
+  const destino = x => [x.end, x.reg, cepFmt(x.cep)].filter(Boolean).join(", ");
+  const temEnd = x => !!(x.end || x.cep);
+  function mensagem(x) {
+    return [`🚚 Entrega · ${x.nome}`,
+      `📍 ${[x.end, x.reg, x.cep ? "CEP " + cepFmt(x.cep) : ""].filter(Boolean).join(", ") || "endereço não cadastrado"}`,
+      ...(x.ref ? [`📌 Ref.: ${x.ref}`] : []),
+      ...(x.recado ? [`📝 Recado: ${x.recado}`] : []),   // 21/11 (E14c): recado também na mensagem do entregador
+      ...(digitosNumero(x.cel) ? [`📞 Cliente: ${fmtCel(x.cel)}`] : []),
+      x.cobrar > 0 ? `💰 Cobrar: ${reais(x.cobrar)}` : "💰 Já pago (não cobrar)",
+      ...(temEnd(x) ? [`🗺️ Rota: https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(destino(x))}`] : []),
+      `Responda "saí" ao sair e "entreguei" ao entregar 👍`].join("\n");
+  }
+  function aviso(txt) {
+    const a = $("#aviso"); a.textContent = txt;
+    if (txt) { a.style.top = ((window.visualViewport ? visualViewport.offsetTop : 0) + 8) + "px"; setTimeout(() => { a.textContent = ""; }, 6000); }
+  }
+  function enviarBot(texto) {
+    if (tg && tg.platform && tg.platform !== "unknown") { tg.sendData(texto); return; }   // fecha a janela e manda ao bot
+    $("#saida").hidden = false; $("#saida").textContent = texto;                           // fora do Telegram: só mostra
+  }
+  // folha de baixo com os entregadores (mesmo visual da escolha do app da rota).
+  // 14/11: ✕ no topo, "✕ Cancelar" embaixo e toque fora fecham sem fazer nada; opts.atual = entregador já escolhido
+  // (aparece marcado) e opts.limpar = mostra "Tirar a escolha".
+  function escolherEntregador(titulo, depois, opts = {}) {
+    if (!ENTREGADORES.length) { aviso("Nenhum entregador cadastrado: use + Entregador (no fim da página)."); abrirCadastro(); return; }
+    let ult = opts.atual || ""; if (!ult) { try { ult = localStorage.getItem(CHAVE + "ultimo") || ""; } catch (e) {} }
+    const fundo = document.createElement("div");
+    fundo.className = "cb-fundo";
+    fundo.innerHTML = `<div class="cb-folha" role="dialog" aria-label="${esc(titulo)}">
+      <div class="cb-folha-topo"><b>${esc(titulo)}</b><button type="button" class="cb-folha-x" aria-label="Fechar">✕</button></div>
+      <div class="en-lista-ent">${ENTREGADORES.map(g => `<button type="button" data-ent="${esc(g[0])}"${g[0] === ult ? ' class="ultimo"' : ""}>🛵 ${esc(g[1])} <small>${esc(fmtCel(g[2]))}</small>${g[0] === opts.atual ? " ✓" : ""}</button>`).join("")}</div>
+      ${opts.limpar ? '<button type="button" class="cb-cancelar" data-limpar="1">Remover entregador</button>' : ""}
+      <button type="button" class="cb-cancelar" data-cancelar="1">✕ Cancelar</button></div>`;
+    const fechar = () => fundo.remove();
+    fundo.onclick = e => { if (e.target === fundo) fechar(); };
+    fundo.querySelector(".cb-folha-x").onclick = fechar;
+    fundo.querySelector("[data-cancelar]").onclick = fechar;
+    if (opts.limpar) fundo.querySelector("[data-limpar]").onclick = () => { fechar(); opts.limpar(); };
+    fundo.querySelectorAll("[data-ent]").forEach(b => b.onclick = () => { fechar(); depois(ENTREGADORES.find(g => g[0] === b.dataset.ent)); });
+    document.body.appendChild(fundo);
+  }
+  const esquecerEsc = p => { try { localStorage.setItem(CHAVE + p, "-"); } catch (e) {} };   // 17/11: "-" = removido (o da venda não volta)
+  // 💬 Enviar ao entregador: abre o WhatsApp NO NÚMERO DELE com a mensagem pronta e copia o endereço (não envia sozinho)
+  // 15/11: escolher ≠ enviar. "🚚 Enviar ao <nome>" só aparece com entregador escolhido e abre direto o WhatsApp dele.
+  function mandarAoEntregador(x) {
+    const g = ENTREGADORES.find(g => g[0] === entDe(x));
+    if (!g) { selecionarEntregador(x); return; }
+    if (temEnd(x)) { try { copiarTexto(destino(x)); } catch (e) {} }
+    abrirLink(`https://wa.me/55${digitosNumero(g[2])}?text=${encodeURIComponent(mensagem(x))}`);
+  }
+  // "👤 Selecionar entregador": só grava a escolha (neste aparelho; nada vai ao bot) e NÃO abre o WhatsApp.
+  // "Remover entregador" só com escolha feita e antes do 🛵 Saiu.
+  function selecionarEntregador(x) {
+    escolherEntregador(`👤 Entregador da entrega de ${x.nome}`, g => { guardarEsc(x.ped, g[0]); mostrar(); },
+      { atual: entDe(x), limpar: !x.saiu && entDe(x) ? () => { esquecerEsc(x.ped); mostrar(); } : null });
+  }
+  // 💬 do cliente (14/11): abre a conversa com ele, sem texto pronto
+  function abrirCliente(x) {
+    const d = digitosNumero(x.cel);
+    if (d) abrirLink(`https://wa.me/55${d}`);
+  }
+  // 15/11: depois do 1º toque, 🛵/✅/↩️ do card ficam desativados e o tocado vira "⏳ aguarde…" (evita gravar 2×)
+  const enviando = new Set();
+  function travar(b) {
+    // 17/11 (E5): os botões somem e fica só "⏳ processando…" até chegar o botão novo
+    const ac = b.closest(".en-acoes");
+    if (ac) ac.innerHTML = `<div class="en-proc">⏳ processando…</div>`;
+  }
+  // 15/11: ✅ Entregue com valor a cobrar → folha "💰 Pagamento na entrega" (ela é a confirmação, como o "sim").
+  // 💵 Recebeu (valor = restante, editável + forma obrigatória) ou ⏳ Não recebeu; se faltar algo: motivo + nova data
+  // (horário opcional). 📝 Observação opcional. ✕ Cancelar / ✕ / toque fora = nada gravado. Números finais: do motor.
+  const MOTIVOS = ["vai pagar depois", "sem dinheiro agora", "pix/cartão não passou", "outro"];
+  const FORMAS = [["dinheiro", "💵 Dinheiro"], ["pix", "⚡ Pix"], ["cartão", "💳 Cartão"]];
+  const virgula = n => Number(n).toFixed(2).replace(".", ",");
+  const lerValor = lerValorBR;   // 18/11 (E8c): aceita o valor enquanto digita ("430," = 430)
+  // (a página de Entregas não carrega os helpers dos formulários: hoje e horários locais)
+  const hojeLocal = () => { const d = new Date(); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); return d.toISOString().slice(0, 10); };
+  const HORAS_PG = []; for (let m = 8 * 60; m <= 20 * 60; m += 30) HORAS_PG.push(String(Math.floor(m / 60)).padStart(2, "0") + ":" + String(m % 60).padStart(2, "0"));
+  function pagamentoEntrega(x, confirmar) {
+    const fundo = document.createElement("div");
+    fundo.className = "cb-fundo";
+    const chips = (nome, ops) => `<div class="pg-chips" data-g="${nome}">${ops.map(([v, r]) => `<button type="button" data-v="${esc(v)}">${esc(r)}</button>`).join("")}</div>`;
+    fundo.innerHTML = `<div class="cb-folha pg-folha" role="dialog" aria-label="Pagamento na entrega">
+      <div class="cb-folha-topo"><b>💰 Pagamento na entrega</b><button type="button" class="cb-folha-x" aria-label="Fechar">✕</button></div>
+      <div class="pg-cobrar">${esc(x.nome)} · ${esc(x.ped)}<br>A cobrar: <b>${reais(x.cobrar)}</b></div>
+      <div class="pg-op"><button type="button" data-op="sim">💵 Recebeu</button><button type="button" data-op="nao">⏳ Não recebeu</button></div>
+      <div id="pg_rec" hidden><label for="pg_valor">Valor recebido *</label>
+        <input id="pg_valor" type="text" inputmode="decimal" value="${virgula(x.cobrar)}">
+        <div class="pg-conta com-linha" id="pg_conta" hidden></div>
+        <label>Forma *</label>${chips("forma", FORMAS)}</div>
+      <div id="pg_falta" hidden><label>Motivo *</label>${chips("motivo", MOTIVOS.map(m => [m, m]))}
+        <div class="dupla"><div><label for="pg_data">Nova data de cobrança *</label><input id="pg_data" type="date" min="${hojeLocal()}"></div>
+        <div><label for="pg_hora">Horário</label><select id="pg_hora"><option value="">— (sem horário)</option>${HORAS_PG.map(h => `<option>${h}</option>`).join("")}</select></div></div></div>
+      <div id="pg_obs_caixa" hidden><label for="pg_obs">📝 Observação (opcional)</label>
+        <textarea id="pg_obs" maxlength="200" placeholder="ex.: cliente pediu pra passar sexta"></textarea></div>
+      <div class="pg-erro" id="pg_erro"></div>
+      <div class="pg-recibo" id="pg_recibo" hidden></div>
+      <button type="button" class="pg-ok" id="pg_ok" hidden>✅ Confirmar entrega</button>
+      <button type="button" class="cb-cancelar" data-cancelar="1">✕ Cancelar</button></div>`;
+    const $f = s => fundo.querySelector(s);
+    let op = "", forma = "", motivo = "", celNovo = "", feito = false;
+    // 18/11 (E8b): número salvo pelo ✏️ e não confirmado vai sozinho ao bot ao fechar (grava só o celular)
+    const fechar = () => { fundo.remove(); if (celNovo && !feito) { feito = true; mandarBot(`📱 WHATSAPP ${x.cli}: ${celNovo}`); } };
+    const erro = t => { $f("#pg_erro").textContent = t; };
+    // a parte "falta" aparece no ⏳ Não recebeu e no 💵 Recebeu com valor menor que o restante
+    const atualizar = () => {
+      const v = lerValor($f("#pg_valor").value);
+      fundo.querySelectorAll("[data-op]").forEach(b => b.classList.toggle("on", b.dataset.op === op));
+      $f("#pg_rec").hidden = op !== "sim";
+      $f("#pg_falta").hidden = !(op === "nao" || (op === "sim" && v >= 0 && v < x.cobrar - 0.005));
+      $f("#pg_obs_caixa").hidden = $f("#pg_ok").hidden = $f("#pg_recibo").hidden = !op;   // 17/11 (E7): + recibo
+      fundo.querySelectorAll('[data-date], input[type=date], select').forEach(el => el.classList.toggle("vazio", !el.value));
+      // 18/11 (E8d): Cobrar / Recebido / Falta a cada tecla no 💵 Recebeu (só na tela, não grava)
+      const c = $f("#pg_conta"), rec = v > 0 ? v : 0, maior = op === "sim" && rec > x.cobrar + 0.005;
+      c.hidden = op !== "sim"; $f("#pg_ok").disabled = maior;
+      if (op === "sim") c.innerHTML = `<div><span>Cobrar:</span><b>${reais(x.cobrar)}</b></div><div><span>Recebido:</span><b>${reais(rec)}</b></div>`
+        + (maior ? `<div class="maior">⚠️ maior que o valor do pedido</div>`
+                 : `<div class="falta"><span>Falta:</span><b>${reais(Math.round((x.cobrar - rec) * 100) / 100)}</b></div>`);
+    };
+    fundo.onclick = e => { if (e.target === fundo) fechar(); };
+    $f(".cb-folha-x").onclick = fechar;
+    $f("[data-cancelar]").onclick = fechar;
+    fundo.querySelectorAll("[data-op]").forEach(b => b.onclick = () => { op = b.dataset.op; erro(""); atualizar(); });
+    fundo.querySelectorAll(".pg-chips").forEach(g => g.querySelectorAll("button").forEach(b => b.onclick = () => {
+      g.querySelectorAll("button").forEach(o => o.classList.toggle("on", o === b));
+      if (g.dataset.g === "forma") forma = b.dataset.v; else motivo = b.dataset.v;
+      erro("");
+    }));
+    $f("#pg_valor").oninput = () => { erro(""); atualizar(); };
+    $f("#pg_data").onchange = $f("#pg_hora").onchange = () => { erro(""); atualizar(); };
+    // 17/11 (E7): 💬 Recibo no WhatsApp — mesma conferência do Confirmar, sem gravar nada
+    const clickRecibo = () => {
+      const rec = op === "sim" ? lerValor($f("#pg_valor").value) : 0;
+      if (op === "sim" && (!(rec > 0) || rec > x.cobrar + 0.005)) { erro("Informe o valor recebido certo antes do recibo."); return; }
+      if (rec > 0 && !forma) { erro("Escolha a forma: dinheiro, pix ou cartão."); return; }
+      const falta = Math.round((x.cobrar - rec) * 100) / 100, dIso = $f("#pg_data").value;
+      if (falta > 0.005 && !dIso) { erro("Escolha a nova data de cobrança antes do recibo."); return; }
+      abrirRecibo(x.cel, reciboTexto(x.nome, rec, forma, falta, dIso, $f("#pg_hora").value, x.ped));
+    };
+    // 18/11 (E8b): pílula do recibo + ✏️ (campo já preenchido; o número novo vai junto no Confirmar)
+    const recibo = () => {
+      const r = $f("#pg_recibo"), d = digitosNumero(x.cel);
+      r.innerHTML = (celNovo ? `<button type="button" class="cb-num ok" data-recibo="1">💬 ${fmtCelCli(d)} ›</button>` : pilulaRecibo(x.cel))
+        + lapisCel('data-editcel="1"');
+      const rb = r.querySelector("[data-recibo]"); if (rb) rb.onclick = clickRecibo;
+      r.querySelector("[data-editcel]").onclick = () => campoCel(r, x.cel, d => {
+        celNovo = d; lista.forEach(o => { if (o.cli === x.cli) o.cel = d; }); guardarCel(x.cli, d); recibo(); }, recibo, erro);
+    };
+    recibo();
+    $f("#pg_ok").onclick = () => {
+      const rec = op === "sim" ? lerValor($f("#pg_valor").value) : 0;
+      if (op === "sim") {
+        if (!(rec > 0)) { erro("Informe o valor recebido (ou toque em ⏳ Não recebeu)."); $f("#pg_valor").focus(); return; }
+        if (rec > x.cobrar + 0.005) { erro(`O valor passa do que falta receber (${reais(x.cobrar)}).`); $f("#pg_valor").focus(); return; }
+        if (!forma) { erro("Escolha a forma: dinheiro, pix ou cartão."); return; }
+      }
+      const falta = rec < x.cobrar - 0.005, dIso = $f("#pg_data").value, hora = $f("#pg_hora").value;
+      if (falta) {
+        if (!motivo) { erro("Escolha o motivo."); return; }
+        if (!dIso) { erro("Escolha a nova data de cobrança."); $f("#pg_data").focus(); return; }
+        if (dIso < hojeLocal()) { erro("A nova data de cobrança já passou."); return; }
+      }
+      const obs = $f("#pg_obs").value.replace(/\s+/g, " ").trim();
+      const partes = [`💰 recebeu ${virgula(rec)}${rec > 0 ? " no " + forma : ""}`];
+      if (falta) partes.push(`motivo: ${motivo}`, `cobrança: ${dIso.split("-").reverse().join("/")}${hora ? " " + hora : ""}`);
+      if (obs) partes.push(`obs: ${obs}`);
+      if (celNovo) partes.push(`whatsapp: ${celNovo}`);   // 18/11 (E8b): entrega --celular
+      feito = true; fechar();
+      confirmar(partes.join(" · "));
+    };
+    document.body.appendChild(fundo);
+    atualizar();
+  }
+  // 15/11: lembra o último toque (🛵/✅/↩️) por 60 s neste aparelho: a página fecha ao enviar e, se for reaberta
+  // pelo botão antigo antes dos botões novos chegarem, o card ainda vem com o estado velho.
+  const TOQUE_KEY = "cb_toque_entregas", TOQUE_MS = 60000;
+  function lerToques() {
+    try { return JSON.parse(localStorage.getItem(TOQUE_KEY) || "{}") || {}; } catch (e) { return {}; }
+  }
+  function guardarToque(x, st) {
+    try {
+      const m = lerToques(), agora = Date.now();
+      for (const k in m) if (!(agora - m[k].t < TOQUE_MS)) delete m[k];
+      m[x.ped] = { a: st, t: agora, de: x.saiu ? "saiu" : "pend" };
+      localStorage.setItem(TOQUE_KEY, JSON.stringify(m));
+    } catch (e) {}
+  }
+  function toqueRecente(x) {   // ms que faltam (0 = normal)
+    const r = lerToques()[x.ped];
+    if (!r || r.de !== (x.saiu ? "saiu" : "pend")) return 0;
+    const falta = TOQUE_MS - (Date.now() - r.t);
+    return falta > 0 && falta <= TOQUE_MS ? falta : 0;
+  }
+  function status(x, st, b) {
+    if (enviando.has(x.ped) || toqueRecente(x)) return;
+    // 15/11: ✅ Entregue só depois do 🛵 Saiu (o motor também recusa)
+    if (st === "entregue" && !x.saiu) { aviso("Marque 🛵 Saiu primeiro (com o entregador selecionado)."); return; }
+    const ent = entDe(x);
+    const mandar = texto => { enviando.add(x.ped); guardarToque(x, st); if (b) travar(b); mostrar(); enviarBot(texto); };   // 17/11 (E6): mostrar() já muda o card de aba
+    if (st === "entregue" && x.cobrar > 0) {
+      pagamentoEntrega(x, pg => mandar(`🚚 ENTREGA ${x.ped}: entregue${ent ? " · " + ent : ""} · ${pg}`));
+      return;
+    }
+    if (st === "saiu" && !ent && !x.eu) {
+      escolherEntregador(`🛵 Quem saiu com a entrega de ${x.nome}?`, g => { guardarEsc(x.ped, g[0]); mandar(`🚚 ENTREGA ${x.ped}: saiu · ${g[0]}`); });
+      return;
+    }
+    mandar(st === "pendente" ? `🚚 ENTREGA ${x.ped}: pendente` : `🚚 ENTREGA ${x.ped}: ${st}${ent ? " · " + ent : ""}`);
+  }
+  // 14/11 (2º teste): card sempre aberto, sem seleção. Claro = 🕓 pendente; escuro = 🛵 saiu.
+  // Ordem: nome+código (🗺️ no canto) → pedido → 📍 → 💰 → status · 🚚 entregador → 💬 → 🛵/✅ → WhatsApp do cliente (à direita)
+  // 14/11: mesmo padrão do "quanto deve" (SOUL 09/11): 💸 total → 🛒 Débitos em aberto → 📒 talão + data. Bloco zerado some.
+  function blocoDeve(x) {
+    // 17/11 (E5): sem 13º-16º = o cliente só deve esta entrega (aberto = cobrar, sem talão); linhas sempre presentes
+    const d = x.deve || { total: x.cobrar, aberto: x.cobrar, talao: 0, tsit: "" };
+    const t = d.tsit, dataTalao = !t ? "" : t[0] === "v" ? `· ⚠️ vencida desde ${esc(t.slice(1))}`
+      : t[0] === "c" ? `· cobrança ${esc(t.slice(1))}` : "· não tem data de cobrança";
+    return `<div class="situacao en-deve"><div class="rot">Deve no total</div><div class="total">💸 <b>${reais(d.total)}</b></div>`
+      + `<div class="rot">Débitos em aberto:</div><div class="deve">🛒 ${d.aberto > 0 ? `<b>${reais(d.aberto)}</b>` : `<span class="en-vazio">—</span>`}</div>`
+      + `<div class="rot">Débito anterior:</div><div class="deve">📒 (talão): ${d.talao > 0 ? `<b>${reais(d.talao)}</b>` : `<span class="en-vazio">—</span>`}</div>`
+      + `<div class="deve">${d.talao > 0 && dataTalao ? dataTalao : `<span class="en-vazio">&nbsp;</span>`}</div>`
+      + `</div>`;
+  }
+  // 17/11 (E6 etapa B): cliente com 2+ pedidos abertos (pendente ou saiu) → "📦 N pedidos deste cliente"
+  // e, se mais de um tiver frete, "⚠️ frete em N pedidos". Só aviso: não muda valor nem cobrança.
+  function junto(x) {
+    const dele = lista.filter(o => o.cli === x.cli && abaDe(o));
+    if (dele.length < 2) return "";
+    const f = dele.filter(o => o.frete > 0).length;
+    return `📦 ${dele.length} pedidos deste cliente${f > 1 ? ` · ⚠️ frete em ${f} pedidos` : ""}`;
+  }
+  // aba do card: o toque recente (🛵/↩️/✅, até os botões novos chegarem) já move o card; ✅ Entregue tira da lista
+  function abaDe(x) {
+    const r = lerToques()[x.ped];
+    if (r && toqueRecente(x) > 0) return r.a === "entregue" ? "" : r.a === "saiu" ? "saiu" : r.a === "pendente" ? "pend" : (x.saiu ? "saiu" : "pend");
+    return x.saiu ? "saiu" : "pend";
+  }
+  const cartao = x => {
+    const cod = String(x.cli).replace(/\D/g, "").slice(-4), ent = entDe(x), p = esc(x.ped);
+    const rota = temEnd(x) ? `<button type="button" class="cb-rota" data-rota="${p}" aria-label="Rota até o cliente">🗺️</button>`
+      : `<span class="cb-rota off" aria-label="Sem endereço">🗺️</span>`;
+    const st = x.saiu ? "🛵 saiu" : "🕓 pendente";   // 17/11 (E6b): chip curto; a hora da saída vai embaixo do pedido   // 17/11 (E5c): hora da venda saiu do chip, vai embaixo do pedido
+    const espera = toqueRecente(x) > 0, off = "";
+    // 18/11 (E6c): topo novo. Linha 1 = nome + 💬 do cliente; linha 2 = pedido · data hora (saiu = hora da saída, E6b) + 🗺️;
+    // linha 3 = etiqueta (🛵 entregador / 🛵 Motoboy / 🙋 Eu entrego) + status (🕓 pendente / 🛵 saiu)
+    const quando = x.saiu ? (x.saida ? esc(x.saida) : `<span class="en-vazio">—</span>`) : x.hora ? esc(x.hora) : `<span class="en-vazio">—</span>`;
+    return `<div class="en-item ${x.saiu ? "saiu" : "pend"}">`
+      + `<div class="en-topo1"><div class="cb-nome">${esc(nomeCod(x.nome, cod))}</div>${rota}</div>`
+      + `<div class="en-topo2"><div class="en-ped">${p} · ${quando}</div></div>`
+      + `<div class="en-topo3"><span class="en-eu">${x.eu ? "🙋 Eu entrego" : "🛵 " + esc(ent ? nomeEnt(ent) : "Motoboy")}</span><span class="en-chip">${st}</span></div>`
+      // 17/11 (E5b): endereço em 2 linhas (bairro em cima, rua embaixo), sem rótulos; "—" se faltar
+      + `<div class="en-end"><div class="cb-li">${x.reg ? esc(x.reg) : `<span class="en-vazio">sem região</span>`}</div>`
+      + `<div class="cb-li">${x.end ? esc(x.end) : `<span class="en-vazio">—</span>`}</div>`
+      + (x.recado ? `<div class="cb-li">📝 ${esc(x.recado)}</div>` : "") + `</div>`   // 20/11 (E14): recado do pedido abaixo do endereço
+      + (x.cobrar > 0 ? `<div class="cb-li">💰 Cobrar nesta entrega: <b class="en-valor">${reais(x.cobrar)}</b></div>` : `<div class="cb-li en-pago">✅ Já pago</div>`)
+      // 17/11 (E5): frete embaixo do valor (linha sempre presente; "—" sem frete)
+      + `<div class="cb-li">🚚 Frete${x.reg && x.frete ? " (" + esc(x.reg) + ")" : ""}: ${x.frete ? reais(x.frete) : `<span class="en-vazio">—</span>`}</div>`
+      + `<div class="cb-li en-junto">${junto(x) || "&nbsp;"}</div>`   // 17/11 (E6): 📦 2+ pedidos do mesmo cliente
+      + blocoDeve(x)
+      // 18/11 (E6e): 💬 do cliente à direita, logo ACIMA dos botões (🛵 Saiu…)
+      + `<div class="cb-cel">${pilulaCel(x.cel, `data-cli="${p}"`, "Abrir a conversa com o cliente no WhatsApp")}${lapisCel(`data-lapis="${p}"`)}</div>`   // 18/11 (E8b): + ✏️
+      + `<div class="en-acoes">`
+      + (espera ? `<div class="en-proc">⏳ processando…</div>` : "")
+      // 15/11 (BOTOES_ETAPA): cada etapa só com os botões dela. 🕓 pendente: Enviar/Selecionar/🛵 Saiu (sem ✅).
+      // 🛵 saiu: só ↩️ Pendente + ✅ Entregue (não se troca entregador depois da saída).
+      + (espera ? "" : x.saiu
+        ? `<button type="button" data-a="pendente" data-p="${p}"${off}>↩️ Pendente</button>`
+          + `<button type="button" data-a="entregue" data-p="${p}"${off}>✅ Entregue</button>`
+        : x.eu ? `<button type="button" class="en-full" data-a="saiu" data-p="${p}"${off}>🛵 Saiu</button>`   // 17/11: Eu entrego
+        : (ent ? `<button type="button" class="zap" data-a="zap" data-p="${p}">🚚 Enviar ao ${esc(nomeEnt(ent))}</button>` : "")
+          + `<button type="button" class="en-sel" data-a="sel" data-p="${p}">👤 Selecionar entregador</button>`
+          + `<button type="button" class="en-full" data-a="saiu" data-p="${p}"${off}>🛵 Saiu</button>`)
+      + `</div>`
+      + `</div>`;
+  };
+  let reMostrar = null, aba = "";
+  function mostrar() {
+    const el = $("#en_lista");
+    clearTimeout(reMostrar);
+    const prox = Math.min(...lista.map(toqueRecente).filter(n => n > 0), Infinity);
+    if (prox !== Infinity) reMostrar = setTimeout(mostrar, prox + 200);
+    // 17/11 (E6 etapa B): abas 🕓 Pedidos / 🛵 A caminho com contador; abre em Pedidos (ou A caminho se Pedidos vazio)
+    const nP = lista.filter(x => abaDe(x) === "pend").length, nS = lista.filter(x => abaDe(x) === "saiu").length;
+    if (!aba) aba = !nP && nS ? "saiu" : "pend";
+    const ab = $("#en_abas");
+    ab.innerHTML = `<button type="button" data-aba="pend"${aba === "pend" ? ' class="on"' : ""}>🕓 Pedidos (${nP})</button>`
+      + `<button type="button" data-aba="saiu"${aba === "saiu" ? ' class="on"' : ""}>🛵 A caminho (${nS})</button>`;
+    ab.querySelectorAll("[data-aba]").forEach(b => b.onclick = () => { aba = b.dataset.aba; mostrar(); });
+    const vis = lista.filter(x => abaDe(x) === aba);
+    el.innerHTML = vis.length ? vis.map(cartao).join("") : `<div class="cb-vazio">✅ Nenhum pedido aqui</div>`;
+    const achar = p => lista.find(x => x.ped === p);
+    const rota = x => abrirRota({ nome: x.nome, end: x.end, reg: x.reg, cep: x.cep }, true);
+    el.querySelectorAll("button.cb-rota[data-rota]").forEach(b => b.onclick = () => rota(achar(b.dataset.rota)));
+    el.querySelectorAll("button.cb-num[data-cli]").forEach(b => b.onclick = () => abrirCliente(achar(b.dataset.cli)));
+    el.querySelectorAll("button.cel-lapis[data-lapis]").forEach(b => b.onclick = () => {   // 18/11 (E8b): grava só o número
+      const x = achar(b.dataset.lapis);
+      folhaCel(x.cli, x.nome, x.cel, d => { lista.forEach(o => { if (o.cli === x.cli) o.cel = d; }); mostrar(); });
+    });
+    el.querySelectorAll("[data-a]").forEach(b => b.onclick = () => {
+      const x = achar(b.dataset.p), a = b.dataset.a;
+      if (a === "zap") mandarAoEntregador(x); else if (a === "sel") selecionarEntregador(x); else status(x, a, b);
+    });
+  }
+  // + Entregador (E3): nome + WhatsApp — mesma regra e cores do campo WhatsApp dos formulários; vai ao bot com prévia e "sim"
+  function pintarCel(saindo) {
+    const inp = $("#g_cel"), campo = $("#g_cel_campo"), caixa = $("#g_cel_caixa");
+    const e = erroNumeroCel(inp.value), fixo = digitosNumero(inp.value).length === 10, semDDD = e.startsWith("Celular sem DDD");
+    campo.classList.toggle("cel-certo", !!inp.value && !e && !fixo);
+    campo.classList.toggle("cel-fixo", !!inp.value && !e && fixo);
+    if (saindo) {
+      if (!e && inp.value) inp.value = fmtCel(inp.value);
+      campo.classList.toggle("sem-ddd", semDDD);
+      caixa.classList.toggle("campo-ruim", !!e && !semDDD); campo.classList.toggle("cel-ruim", !!e && !semDDD);
+    } else if (!e) { campo.classList.remove("sem-ddd", "cel-ruim"); caixa.classList.remove("campo-ruim"); }
+    else if (digitosNumero(inp.value).length > 11) { caixa.classList.add("campo-ruim"); campo.classList.add("cel-ruim"); }
+  }
+  function abrirCadastro() {
+    $("#en_form").classList.remove("oculto"); $("#en_add").classList.add("oculto");
+    $("#en_form").scrollIntoView({ behavior: "smooth", block: "start" }); $("#g_nome").focus();
+  }
+  // 14/11: ✕ Cancelar fecha o quadro e limpa os campos (e as cores)
+  function cancelarCadastro() {
+    $("#g_nome").value = ""; $("#g_cel").value = ""; $("#g_nome").classList.remove("erro-campo");
+    $("#g_cel_campo").className = "campo-cel"; $("#g_cel_caixa").className = "ddi"; $("#aviso").textContent = "";
+    $("#en_form").classList.add("oculto"); $("#en_add").classList.remove("oculto");
+  }
+  function salvarEntregador() {
+    const nome = $("#g_nome").value.trim().replace(/\s+/g, " "), v = $("#g_cel").value, e = erroNumeroCel(v);
+    pintarCel(true);
+    if (!nome) { aviso("Falta o nome do entregador."); $("#g_nome").classList.add("erro-campo"); $("#g_nome").focus(); return; }
+    if (!digitosNumero(v)) { aviso("Falta o WhatsApp do entregador."); $("#g_cel_caixa").classList.add("campo-ruim"); $("#g_cel").focus(); return; }
+    if (e) { aviso(e); $("#g_cel").focus(); return; }
+    const d = digitosNumero(v);
+    if (ENTREGADORES.some(g => digitosNumero(g[2]) === d)) { aviso("Esse WhatsApp já é de um entregador cadastrado."); return; }
+    enviarBot(["🚚 ENTREGADOR NOVO", "", `Nome: ${nome}`, `WhatsApp: +55 ${fmtCel(d)}${d.length === 10 ? " (fixo — confirmar)" : ""}`].join("\n"));
+  }
+  $("#titulo").textContent = "🚚 Entregas";
+  document.querySelector(".sub").textContent = "Interno. O entregador recebe só a mensagem no WhatsApp. Saiu, Entregue e ↩️ gravam direto.";
+  $("#enviar").remove();
+  // 14/11 (1º teste): topo só com as entregas; cadastro de entregador no fim da página
+  form.innerHTML = `<div class="abas en-abas" id="en_abas"></div><div id="en_lista"></div>
+    <div class="en-cad"><legend>Entregadores</legend>
+      <div class="en-ents">${ENTREGADORES.length ? "🛵 " + ENTREGADORES.map(g => esc(g[1])).join(" · ") : "Nenhum entregador cadastrado ainda."}</div>
+      <button type="button" class="add" id="en_add">+ Entregador</button>
+      <div class="en-form oculto" id="en_form">
+        <label for="g_nome">Nome do entregador *</label><input id="g_nome" placeholder="Ex.: João Motoboy">
+        <div class="campo-cel" id="g_cel_campo">
+          <label for="g_cel">Celular / <span class="lb-wpp">WhatsApp</span> (<span class="lb-ddd">com DDD</span>) *</label>
+          <div class="ddi" id="g_cel_caixa"><span>+55</span><input id="g_cel" type="tel" inputmode="tel" placeholder="(00) 00000-0000"></div></div>
+        <div class="en-form-bts"><button type="button" class="cb-cancelar" id="en_cancelar">✕ Cancelar</button>
+          <button type="button" class="en-salvar" id="en_salvar">Realizar cadastro</button></div>
+        <div class="dica">O bot mostra a prévia e só grava depois do seu "sim".</div></div></div>`;
+  $("#en_add").onclick = abrirCadastro;
+  $("#en_cancelar").onclick = cancelarCadastro;
+  $("#g_cel").addEventListener("blur", () => pintarCel(true));
+  $("#g_cel").addEventListener("input", () => pintarCel(false));
+  $("#g_nome").addEventListener("input", () => $("#g_nome").classList.remove("erro-campo"));
+  $("#en_salvar").onclick = salvarEntregador;
+  mostrar();
+  if (tg) { tg.ready(); tg.expand(); }
+}
+
+// ---------- 21/11 (E17 📊): Vendas em perspectiva (só consulta: não envia, não grava) ----------
+// O motor manda a soma por dia (Brasília, pedidos não cancelados, sem frete); a página calcula os 6 cards
+// com a data de HOJE (link aberto no dia seguinte não mostra "Hoje" errado).
+function montarRelatorio() {
+  const dia = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo" }).format(new Date());
+  const D = iso => new Date(iso + "T00:00:00Z");
+  const iso = d => d.toISOString().slice(0, 10);
+  const soma = (iso_, n) => { const d = D(iso_); d.setUTCDate(d.getUTCDate() + n); return iso(d); };
+  const porDia = {};
+  const R = RELATORIO || { a: dia, t: "", d: [] };
+  for (const [k, v, n] of R.d || []) porDia[soma(R.a, -k)] = [Number(v) || 0, Number(n) || 0];
+  const total = (de, ate) => { let v = 0, n = 0;
+    for (let d = de; d <= ate; d = soma(d, 1)) { const x = porDia[d]; if (x) { v += x[0]; n += x[1]; } }
+    return { v: Math.round(v * 100) / 100, n }; };
+  const ini = d => d.slice(0, 8) + "01";
+  const fimMesAnt = d => soma(ini(d), -1);
+  const h = dia, mesIni = ini(h), antFim = fimMesAnt(h), antIni = ini(antFim), ant2Fim = fimMesAnt(antIni), ant2Ini = ini(ant2Fim);
+  const P = [
+    ["Hoje", [h, h], [soma(h, -1), soma(h, -1)]],
+    ["Ontem", [soma(h, -1), soma(h, -1)], [soma(h, -2), soma(h, -2)]],
+    ["7 dias", [soma(h, -6), h], [soma(h, -13), soma(h, -7)]],
+    ["30 dias", [soma(h, -29), h], [soma(h, -59), soma(h, -30)]],
+    ["Este mês", [mesIni, h], [antIni, antFim]],
+    ["Mês anterior", [antIni, antFim], [ant2Ini, ant2Fim]],
+  ].map(([t, a, b]) => ({ t, ...total(...a), base: total(...b).v }));
+  const reais = n => "R$ " + Math.abs(n).toFixed(2).replace(".", ",").replace(/\B(?=(\d{3})+,)/g, ".");
+  const nv = n => n.toLocaleString("pt-BR") + (n === 1 ? " venda" : " vendas");
+  const variacao = p => {
+    const dif = Math.round((p.v - p.base) * 100) / 100, s = dif < 0 ? "−" : "+";
+    const pct = p.base ? s + (Math.abs(dif) / p.base * 100).toFixed(1).replace(".", ",") + "%" : "sem base percentual anterior";
+    return `${s}${reais(dif)} · ${pct}`;
+  };
+  document.title = "Relatório";
+  document.body.className = "rl";
+  document.documentElement.style.background = "#0c0a0b";
+  document.body.innerHTML = `<style>
+    html:has(body.rl) { background: #0c0a0b; }
+    body.rl { background: #0c0a0b; color: #f4eef0; padding: 10px 10px 28px; min-height: 100vh;
+              font: 16px/1.35 -apple-system, "Segoe UI", Roboto, sans-serif; }
+    .rl-painel { border: 1px solid rgba(255,255,255,.12); border-radius: 22px; padding: 16px 12px 14px;
+                 background: linear-gradient(160deg, #241a1e 0%, #141012 55%, #120f11 100%); }
+    .rl-topo { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+    .rl-topo h1 { font-size: clamp(17px, 5.2vw, 21px); font-weight: 500; margin: 0; color: #f4eef0; }
+    .rl-topo span { font-size: 13px; color: #a39a9e; white-space: nowrap; }
+    .rl-dados { font-size: 11px; color: #8a8185; margin: 2px 0 14px; }
+    .rl-grade { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap: 10px; }
+    .rl-card { text-align: left; font: inherit; color: inherit; cursor: pointer; border-radius: 16px; padding: 14px 12px;
+               border: 1px solid rgba(255,255,255,.10); background: linear-gradient(160deg, #1d181b, #151214);
+               -webkit-tap-highlight-color: transparent; min-width: 0;
+               display: flex; flex-direction: column; justify-content: flex-start; }
+    .rl-card.ativo { border-color: #e48aa6; background: linear-gradient(160deg, #47202f 0%, #2a161e 60%, #21141a 100%); }
+    .rl-t { font-size: 15px; color: #d9d0d4; }
+    .rl-v { font-size: clamp(16px, 4.9vw, 25px); font-weight: 500; margin: 12px 0 10px; color: #fff; white-space: nowrap; letter-spacing: -.01em; }
+    .rl-n { font-size: 14px; color: #a39a9e; }
+    .rl-var { font-size: 12px; color: #a39a9e; margin-top: 12px; }
+    .rl-total { margin-top: 12px; border: 1px solid rgba(255,255,255,.12); border-radius: 22px; padding: 12px 18px 14px;   /* 21/11 (E17b): mais baixo, cabe sem rolar */
+                background: linear-gradient(160deg, #2a1a21 0%, #161113 60%); }
+    .rl-total .rl-t { font-size: 14px; color: #a39a9e; }
+    .rl-total b { display: block; font-size: clamp(28px, 9vw, 38px); font-weight: 500; margin-top: 6px; color: #fff; line-height: 1.15; }
+    .rl-total small { display: block; font-size: 13px; color: #a39a9e; margin-top: 4px; }
+  </style>
+  <div class="rl-painel">
+    <div class="rl-topo"><h1>Vendas em perspectiva</h1><span>Horário de Brasília</span></div>
+    <div class="rl-dados">${R.t ? "dados de " + R.t : "sem dados no link: feche e abra pelo botão"}</div>
+    <div class="rl-grade">${P.map((p, i) => `<button type="button" class="rl-card" data-i="${i}">
+      <div class="rl-t">${p.t}</div><div class="rl-v">${reais(p.v)}</div>
+      <div class="rl-n">${nv(p.n)}</div><div class="rl-var">${variacao(p)}</div></button>`).join("")}</div>
+  </div>
+  <div class="rl-total"><div class="rl-t">Total de vendas</div><b id="rl_total"></b><small id="rl_per"></small></div>`;
+  const escolher = i => {
+    document.querySelectorAll(".rl-card").forEach(c => c.classList.toggle("ativo", c.dataset.i === String(i)));
+    document.getElementById("rl_total").textContent = reais(P[i].v);
+    document.getElementById("rl_per").textContent = P[i].t + " · " + nv(P[i].n);
+  };
+  document.querySelectorAll(".rl-card").forEach(c => c.onclick = () => escolher(Number(c.dataset.i)));
+  escolher(0);   // abre com "Hoje" destacado
+  if (tg) { tg.ready(); tg.expand(); try { tg.setHeaderColor("#0c0a0b"); tg.setBackgroundColor("#0c0a0b"); } catch (e) {} }
+}
+
 function montar() {
 const OUTRO = "__outro";
 
@@ -151,13 +1240,16 @@ const num = v => { const n = parseFloat(String(v || "").replace(/\./g, "").repla
 const val = id => ($("#" + id)?.value || "").trim();
 const esc = t => String(t).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 const sem = t => (t || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+if (tipo === "cobrancas") { montarCobrancas(); return; }   // 13/11: página só de consulta
+if (tipo === "entregas") { montarEntregas(); return; }     // 14/11 (E4 🚚): interno
+if (tipo === "relatorio") { montarRelatorio(); return; }   // 21/11 (E17 📊): só consulta
 
 const CAMPO = (id, rotulo, tipoInput = "text", extra = "") =>
   `<label for="${id}">${rotulo}</label><input id="${id}" type="${tipoInput}" ${extra}>`;
 // Celular/WhatsApp (08/11): +55 fixo na frente; digita só DDD + número. Fixo de empresa (DDD + 8) também vale.
 const CAMPO_CEL = (id, msg = true) => `<div class="campo-cel" id="${id}_campo">
   <label for="${id}">Celular / <span class="lb-wpp">WhatsApp</span> (<span class="lb-ddd">com DDD</span>)</label>
-  <div class="ddi" id="${id}_caixa"><span>+55</span><input id="${id}" type="tel" inputmode="tel" placeholder="(11) 98586-7941"></div>
+  <div class="ddi" id="${id}_caixa"><span>+55</span><input id="${id}" type="tel" inputmode="tel" placeholder="(00) 00000-0000"></div>
   ${msg ? `<div class="cel-msg" id="${id}_msg"></div>` : ""}</div>`;
 
 // Horários de 30 em 30 min, 08:00–20:00 (05/11): lista, sem digitar símbolo.
@@ -253,8 +1345,12 @@ function escolherCliente(c) {
     clienteEscolhido = null;
     if ($("#bloco-cel")) { $("#bloco-cel").classList.add("oculto"); $("#v_cel").value = ""; }
     $("#caixa-cliente").innerHTML = `<input id="busca" placeholder="Cliente… (toque ou digite)"><div class="achados" id="achados"></div>`;
+    ajustarModalTalao();   // 12/11 (I031): sem cliente = modal completo
     ligarBusca(); $("#busca").focus();
+    somar();               // 13/11 (E2 🚚): sem cliente = sem região de frete
   };
+  ajustarModalTalao();     // 12/11 (I031): cliente com talão = modal encolhe
+  somar();                 // 13/11 (E2 🚚): frete da região do cliente
 }
 const nomeCliente = () => clienteEscolhido ? `${clienteEscolhido[1]} (${clienteEscolhido[0]})` : val("busca");
 
@@ -267,8 +1363,10 @@ const CADASTRO = `
   <select id="c_bairro"><option value="">—</option>${opsBairro}<option value="${OUTRO}">Outros (escrever)</option></select>
   <input id="c_bairro_novo" class="oculto" placeholder="Nome do bairro novo" style="margin-top:8px">
   ${CAMPO("c_end", "Endereço")}
+  <div class="dica oculto" id="c_end_dica"></div>
   ${CAMPO("c_ref", "Referência (ponto conhecido perto)")}
-  <div id="c_cep_campo">${CAMPO("c_cep", "CEP", "text", 'inputmode="numeric" placeholder="00000-000"')}</div>
+  <div id="c_cep_campo">${CAMPO("c_cep", "CEP", "text", 'inputmode="numeric" placeholder="00000-000"')}
+    <div class="dica oculto" id="c_cep_dica"></div></div>
   <div class="dupla"><div>${LISTA_HORA("c_hora_de", "Melhor horário da visita: das", "—")}</div>
     <div>${LISTA_HORA("c_hora_ate", "às", "—")}</div></div>
   ${CAMPO("c_email", "E-mail", "email")}`;
@@ -366,15 +1464,90 @@ function produtos() {
     }
     const novo = !p && g("nome") && (PRODUTOS.length || l.querySelector("[data-novo]"));
     return { nome: p ? `${p[1]} (${p[0]})` : g("nome") + (novo ? " (produto novo)" : ""), qtd: g("qtd") || (p && comQtd() ? "1" : ""), preco: g("preco"), valor: g("valor"),
-             tabela: p ? Number(p[3]) : 0, busca: p ? "" : g("busca") };
+             tabela: p ? Number(p[3]) : 0, busca: p ? "" : g("busca"), el: l };
   }).filter(p => p.nome || p.busca || p.qtd || p.preco || p.valor);
 }
 
-const totalVenda = () => produtos().reduce((s, p) => s + (comQtd() ? num(p.qtd || 1) * num(p.preco) : num(p.valor)), 0)
+const subtotalVenda = () => produtos().reduce((s, p) => s + (comQtd() ? num(p.qtd || 1) * num(p.preco) : num(p.valor)), 0)
   + (tipo === "divida" ? num(val("ant_valor")) : 0);   // 08/11: no talão, o total soma o débito anterior
+// 12/11 (I032): desconto % só no total (vazio/0 = sem desconto; 0,01 a 99,99). Os produtos ficam com o preço cheio.
+// "7,5" e "7.5" valem 7,5% (o num() tira o ponto de milhar, aqui não serve).
+const descPct = () => { const n = parseFloat(String(val("desc_pct") || "").replace(",", ".")); return isNaN(n) ? 0 : n; };
+const descOk = () => { const p = descPct(); return !val("desc_pct") || p === 0 || (p >= 0.01 && p <= 99.99); };
+const descValor = () => { const p = descPct(); return descOk() && p > 0 ? Math.round(subtotalVenda() * p + 1e-7) / 100 : 0; };
+const pctTxt = () => String(descPct()).replace(".", ",") + "%";
+// 13/11 (E2 🚚): Entrega. Eu entrego = sem frete (venda igual a antes). 🚚 Entregador = frete fixo da região
+// (link do botão, f = {região: frete}), somado DEPOIS do desconto (o desconto vale só nos produtos).
+// Região sem frete (ou cliente sem região, ou bairro novo do "Outros") = borda vermelha + frase, não envia.
+// 18/11 (E9): a escolha saiu do meio do formulário e virou o botão de salvar (balcao | vendedor | entregador)
+let MODO_ENTREGA = "vendedor", ENT_ESC = "";
+const comEntregador = () => MODO_ENTREGA === "entregador";
+function regiaoEntrega() {
+  if (tipo === "venda") return clienteEscolhido ? String(clienteEscolhido[2] || "").trim() : "";
+  if (tipo === "cliente") { const s = val("c_bairro"); return s === OUTRO ? val("c_bairro_novo") : s; }
+  return "";
+}
+// 18/11 (E10): frete salvo por ESTE celular ("☑ Salvar como frete do bairro") vale até os botões trazerem o link novo
+function fretesSalvos() { try { return JSON.parse(localStorage.getItem("cb_fretes_salvos") || "{}") || {}; } catch (_) { return {}; } }
+function guardarFrete(reg, v) { try { const s = fretesSalvos(); s[reg] = v; localStorage.setItem("cb_fretes_salvos", JSON.stringify(s)); } catch (_) {} }
+function freteDaRegiao(reg) {
+  if (!reg) return 0;
+  const achar = o => Object.keys(o).find(x => sem(x).trim() === sem(reg).trim());
+  const k = achar(FRETES); if (k) return Number(FRETES[k]) || 0;
+  const s = fretesSalvos(), k2 = achar(s);
+  return k2 ? Number(s[k2]) || 0 : 0;
+}
+// 18/11 (E10): 🛵 com bairro sem frete (ou cliente sem bairro, ou bairro novo) = campo do frete, somando na hora
+const freteNaHora = () => comEntregador() && !(freteDaRegiao(regiaoEntrega()) > 0);
+const freteDigitado = () => lerValorBR(val("frete_val"));
+const freteValor = () => !comEntregador() ? 0 : freteNaHora() ? (freteDigitado() > 0 ? freteDigitado() : 0) : freteDaRegiao(regiaoEntrega());
+const FRETE_ERRO = "Falta o valor do frete.", FRETE_INV = "Valor do frete inválido (ex.: 15,00).";
+const freteErro = () => !freteNaHora() ? "" : isNaN(freteDigitado()) && val("frete_val") ? FRETE_INV : !(freteDigitado() > 0) ? FRETE_ERRO : "";
+const freteRot = () => `Frete (${regiaoEntrega() || "sem bairro"}): ${reais(freteValor())}`;
+const salvarFreteBairro = () => freteNaHora() && !!regiaoEntrega() && !!($("#frete_salvar") && $("#frete_salvar").checked);
+function mostrarFrete() {
+  const fb = $("#frete_box");
+  if (fb) {
+    const reg = regiaoEntrega();
+    fb.classList.toggle("oculto", !freteNaHora());
+    $("#frete_aviso").textContent = reg ? "⚠️ bairro sem frete" : "⚠️ cliente sem bairro";
+    $("#frete_salvar_l").classList.toggle("oculto", !reg); $("#frete_reg").textContent = reg;
+  }
+  const eb = $("#ent_box"); if (eb) eb.classList.toggle("oculto", !comEntregador());   // 17/11 (E2): só com 🚚 Entregador
+  const d = $("#frete_dica");
+  if (!d) return;
+  const e = freteErro(), fv = freteValor();
+  $("#entrega_box").classList.toggle("erro-frete", !!e);
+  d.className = "dica" + (e ? " excesso" : "") + (e || fv ? "" : " oculto");
+  d.textContent = e || (fv ? freteRot() : "");
+}
+const totalVenda = () => Math.round((subtotalVenda() - descValor() + freteValor()) * 100) / 100;   // total COM desconto e frete (pago, restante, frases)
+// 19/11 (E12): frete visível ANTES do 🛵 — só consulta; o Total continua sem frete (vale para 💾 e 🙋)
+function freteMoto() {
+  if (comEntregador() || !(tipo === "venda" || (tipo === "cliente" && temCompra()))) return null;
+  const reg = regiaoEntrega();
+  return reg ? { reg, fr: freteDaRegiao(reg) } : null;   // cliente sem bairro: sem linha
+}
+const totalMoto = fm => Math.round((subtotalVenda() - descValor() + fm.fr) * 100) / 100;
+function linhaMoto() {
+  const fm = freteMoto();
+  if (!fm) return "";
+  // 20/11 (E12b): quebra antes do frete; valores em verde
+  return `<div class="sub moto">${fm.fr > 0 ? `🛵 com motoboy: <span class="v">${reais(totalMoto(fm))}</span><br>`
+      + `(frete ${esc(fm.reg)} <span class="v">${reais(fm.fr)}</span>)`
+    : "🛵 bairro sem frete, digite ao tocar em 🛵"}</div>`;
+}
 function somar() {
-  const t = totalVenda();
-  $("#total").textContent = t > 0 ? (tipo === "divida" ? "Total do talão: " : "Total: ") + reais(t) : "";   // 07/11: caixa testada e recusada, voltou o texto simples
+  const s = subtotalVenda(), dv = descValor(), fv = freteValor(), t = totalVenda();
+  const rot = tipo === "divida" ? "Total do talão: " : "Total: ";
+  // ordem: Subtotal → Desconto → Frete (região) → Total
+  $("#total").innerHTML = s <= 0 ? "" : !dv && !fv ? esc(rot + reais(t))   // 07/11: caixa testada e recusada, voltou o texto simples
+    : `<div class="sub">Subtotal: ${reais(s)}</div>`
+      + (dv ? `<div class="sub">Desconto: ${esc(pctTxt())} (− ${reais(dv)})</div>` : "")
+      + (fv ? `<div class="sub">${esc(freteRot())}</div>` : "")
+      + `<div>${esc(rot + reais(t))}</div>`;
+  if (s > 0) $("#total").insertAdjacentHTML("beforeend", linhaMoto());   // 19/11 (E12)
+  mostrarFrete();
   pagamento();
 }
 
@@ -382,18 +1555,25 @@ function somar() {
 // Pagou tudo → some a cobrança. Pagou parte → data do restante obrigatória.
 function pagamento() {
   if (!$("#pg_valor")) return;
-  const t = Math.round(totalVenda() * 100) / 100, pg = num(val("pg_valor"));
+  const t0 = Math.round(totalVenda() * 100) / 100, pg = num(val("pg_valor"));
   if (tipo === "cliente") $("#bloco-compra").classList.toggle("oculto", !temCompra());   // 08/11: sem produto = só cadastro
+  // 19/11 (E12): pago acima do total mas até o total com 🛵 = conta como motoboy (a trava real é no botão)
+  const fm = freteMoto(), tm = fm && fm.fr > 0 ? totalMoto(fm) : 0;
+  const moto = tm > 0 && pg > t0 + 0.005 && pg <= tm + 0.005, t = moto ? tm : t0;
+  botoesSalvar();   // 18/11 (E9)
   const quitou = pg > 0 && t > 0 && pg >= t - 0.005;
-  $("#fs-cobranca").classList.toggle("oculto", quitou);
-  $("label[for=cobranca]").textContent = pg > 0 && !quitou ? "Data de cobrança do restante *" : "Data de cobrança *";
+  if (tipo === "divida")   // 11/11: a frase mora na COBRANÇA → quitado esconde só data/horário, não o bloco
+    [...$("#fs-cobranca").children].forEach(el => { if (el.tagName !== "LEGEND" && el.id !== "pg_dica") el.classList.toggle("oculto", quitou); });
+  else $("#fs-cobranca").classList.toggle("oculto", quitou);
+  // 12/11 (Wellington): no Débitos o rótulo é sempre curto (cabe na mesma linha do horário)
+  $("label[for=cobranca]").textContent = pg > 0 && !quitou && tipo !== "divida" ? "Data de cobrança do restante *" : "Data de cobrança *";
   const d = $("#pg_dica"), excesso = pg > t + 0.005;
   d.className = "dica" + (!pg ? "" : excesso ? " excesso" : quitou ? " caixa quitada" : " deve");
   const tal = tipo === "divida";
   d.innerHTML = !pg ? (tal ? "Não recebeu nada? Deixe em branco e marque a data da cobrança." : "Não pagou agora? Deixe em branco e marque a data da cobrança.")
     : excesso ? (tal ? "Recebido maior que o total do talão." : "Pago maior que o total da venda.")
-    : quitou ? `<span>✅ ${tal ? "Talão quitado" : "Venda quitada"}</span><span>sem cobrança</span>`
-    : `Falta <b>${reais(t - pg)}</b> marque a data da cobrança do restante.`;
+    : quitou ? `<span>✅ ${tal ? "Talão quitado" : moto ? "Quitada com 🛵 motoboy" : "Venda quitada"}</span><span>sem cobrança</span>`
+    : `Falta <b>${reais(t - pg)}</b>${moto ? " com 🛵 motoboy," : ""} marque a data da cobrança do restante.`;
 }
 
 // Preço diferente da tabela = desconto/combinado: o texto avisa para o bot não trocar pelo de tabela.
@@ -411,6 +1591,24 @@ const PAGAMENTO_HTML = `<fieldset><legend>Pagamento</legend>
       <div class="dupla"><div>${CAMPO("pg_valor", "Pago agora R$", "text", 'inputmode="decimal" placeholder="0,00"')}</div>
         <div><label for="pg_forma">Forma</label><select id="pg_forma"><option value="">—</option><option>dinheiro</option><option>pix</option><option>cartão</option></select></div></div>
       <div class="dica" id="pg_dica">Não pagou agora? Deixe em branco e marque a data da cobrança.</div></fieldset>`;
+// 18/11 (E9): o bloco Entrega do meio do formulário saiu; a escolha é o botão de salvar (💾 / 🙋 / 🛵)
+const ENTREGA_HTML = "";
+// 17/11 (E5): ao tocar em 🚚 Entregador a lista abre na hora (folha de baixo); "Decidir depois" deixa em branco
+function abrirListaEnt(depois, cancelou) {
+  const atual = ENT_ESC, fundo = document.createElement("div");
+  fundo.className = "cb-fundo";
+  fundo.innerHTML = `<div class="cb-folha" role="dialog" aria-label="Entregador">
+    <div class="cb-folha-topo"><b>🚚 Quem vai entregar?</b><button type="button" class="cb-folha-x" aria-label="Fechar">✕</button></div>
+    <div class="en-lista-ent">${ENTREGADORES.map(g => `<button type="button" data-ent="${esc(g[0])}">🛵 ${esc(g[1])}${g[0] === atual ? " ✓" : ""}</button>`).join("")}</div>
+    <button type="button" class="cb-cancelar" data-depois="1">Decidir depois</button></div>`;
+  const fechar = () => fundo.remove(), sair = () => { fechar(); if (cancelou) cancelou(); };
+  const por = id => { ENT_ESC = id; fechar(); if (depois) depois(); };
+  fundo.onclick = e => { if (e.target === fundo) sair(); };
+  fundo.querySelector(".cb-folha-x").onclick = sair;
+  fundo.querySelector("[data-depois]").onclick = () => por("");
+  fundo.querySelectorAll("[data-ent]").forEach(b => b.onclick = () => por(b.dataset.ent));
+  document.body.appendChild(fundo);
+}
 const COBRANCA_HTML = `<fieldset id="fs-cobranca"><legend>Cobrança</legend>
       ${CAMPO("cobranca", "Data de cobrança *", "date")}${HORA_COBRANCA}</fieldset>`;
 // Celular do cliente já cadastrado (08/11): Venda nova e Débitos › Já cadastrado
@@ -419,9 +1617,17 @@ const BLOCO_CEL = `<div id="bloco-cel" class="oculto">${CAMPO_CEL("v_cel", false
 const linhaCel = () => !val("v_cel") ? "Celular: não informado"
   : celMudou() ? `Celular: +55 ${formatarCel(val("v_cel"))}${marcaFixo("v_cel")} (novo — atualizar cadastro)` : `Celular: +55 ${formatarCel(val("v_cel"))}${marcaFixo("v_cel")}`;
 const PRODUTOS_HTML = (titulo) => `<fieldset><legend>${titulo}</legend><div id="produtos"></div>
-  <button type="button" class="add" id="add">+ produto</button><div class="total" id="total"></div></fieldset>`;
+  <button type="button" class="add" id="add">+ produto</button>
+  <div class="desconto">${CAMPO("desc_pct", "Desconto %", "text", 'inputmode="decimal" placeholder="0"')}</div>
+  <div class="frete-box oculto" id="frete_box">
+    <label for="frete_val">🛵 Frete: <span id="frete_aviso">⚠️ bairro sem frete</span></label>
+    <div class="fr-linha"><span>R$</span><input id="frete_val" type="text" inputmode="decimal" placeholder="0,00"></div>
+    <label class="fr-salvar" id="frete_salvar_l"><input type="checkbox" id="frete_salvar" checked> Salvar como frete do <b id="frete_reg"></b></label></div>
+  <div class="total" id="total"></div></fieldset>`;
 const OBS = `<label for="obs">Observação</label><textarea id="obs"></textarea>`;
-const obsLinha = () => val("obs") ? ["", `Obs: ${val("obs")}`] : [];
+// 20/11 (E14 📝): na Venda nova a Observação vira o recado do pedido (vai à cobrança e ao card da 🚚 Entregas)
+const RECADO = `<label for="obs">📝 Recado do pedido (opcional)</label><textarea id="obs" placeholder="Ex.: confirmar com ele antes de sair · portão azul"></textarea>`;
+const obsLinha = () => val("obs") ? ["", `${tipo === "venda" ? "📝 Recado" : "Obs"}: ${val("obs")}`] : [];
 
 // ---------- os 3 formulários ----------
 let modoCliente = "cadastrado";   // débitos anteriores: "cadastrado" ou "novo"
@@ -433,9 +1639,10 @@ if (tipo === "venda") {
       ${BLOCO_CEL}
       ${CAMPO("data", "Data da venda", "date", `value="${hojeISO()}"`)}</fieldset>
     ${PRODUTOS_HTML("Produtos")}
+    ${ENTREGA_HTML}
     ${PAGAMENTO_HTML}
     ${COBRANCA_HTML}
-    <fieldset>${OBS}</fieldset>`;
+    <fieldset>${RECADO}</fieldset>`;
 } else if (tipo === "cliente") {
   $("#titulo").textContent = "👤 Cliente novo";
   form.innerHTML = `
@@ -443,36 +1650,59 @@ if (tipo === "venda") {
     ${PRODUTOS_HTML("Primeira compra (se tiver)")}
     <div id="bloco-compra" class="oculto">
       <fieldset><legend>Venda</legend>${CAMPO("data", "Data da venda", "date", `value="${hojeISO()}"`)}</fieldset>
-      ${PAGAMENTO_HTML}${COBRANCA_HTML}</div>`;
+      ${ENTREGA_HTML}${PAGAMENTO_HTML}${COBRANCA_HTML}</div>`;
 } else {
   $("#titulo").textContent = "📒 Débito anterior (talão)";
   form.innerHTML = `
     <div class="abas"><button type="button" data-m="cadastrado" class="on">Já cadastrado</button>
       <button type="button" data-m="novo">Cadastrar agora</button></div>
-    <fieldset><legend>Cliente</legend>
-      <div id="m-cadastrado">${BUSCA_CLIENTE}${BLOCO_CEL}</div><div id="m-novo" class="oculto">${CADASTRO}</div></fieldset>
-    <fieldset><legend>Talão</legend>${CAMPO("data", "Saída / dia que vendeu os produtos", "date")}</fieldset>
-    ${PRODUTOS_HTML("Produtos")}
+    <fieldset id="fs-cliente"><legend>Cliente</legend>
+      <div id="m-cadastrado">${BUSCA_CLIENTE}${BLOCO_CEL}
+        <div class="dica oculto" id="ja-talao">ℹ️ Este cliente já tem talão registrado. Pagamento ou correção: pelo chat do bot.</div></div><div id="m-novo" class="oculto">${CADASTRO}</div></fieldset>
     <fieldset><legend>Débito anterior</legend>
       <div class="dupla"><div>${CAMPO("ant_valor", "Valor R$", "text", 'inputmode="decimal"')}</div>
         <div id="caixa-ant-data">${CAMPO("ant_data", "Data débito anterior", "date")}</div></div></fieldset>
     <fieldset><legend>Recebimento (se já pagou algo)</legend>
       <div class="dupla"><div>${CAMPO("pg_valor", "Recebeu R$", "text", 'inputmode="decimal" placeholder="0,00"')}</div>
-        <div><label for="pg_forma">Forma</label><select id="pg_forma"><option value="">—</option><option>dinheiro</option><option>pix</option><option>cartão</option></select></div></div>
-      <div id="caixa-rec-data">${CAMPO("rec_data", "Data do recebimento", "date")}</div>
+        <div id="caixa-rec-data">${CAMPO("rec_data", "Data do recebimento", "date")}</div></div>
+      <label for="pg_forma">Forma</label><select id="pg_forma"><option value="">—</option><option>dinheiro</option><option>pix</option><option>cartão</option></select></fieldset>
+    ${PRODUTOS_HTML("Produtos")}
+    <fieldset id="fs-cobranca"><legend>Cobrança</legend>
+      <div class="dupla"><div>${CAMPO("cobranca", "Data de cobrança *", "date")}</div><div>${HORA_COBRANCA}</div></div>
       <div class="dica" id="pg_dica">Não recebeu nada? Deixe em branco e marque a data da cobrança.</div></fieldset>
-    ${COBRANCA_HTML}
     <fieldset>${OBS}</fieldset>`;
   document.querySelectorAll(".abas button").forEach(b => b.onclick = () => {
     modoCliente = b.dataset.m;
     document.querySelectorAll(".abas button").forEach(x => x.classList.toggle("on", x === b));
     $("#m-cadastrado").classList.toggle("oculto", modoCliente !== "cadastrado");
     $("#m-novo").classList.toggle("oculto", modoCliente !== "novo");
+    ajustarModalTalao();   // 12/11: Desconto % só no Cadastrar agora; I031 encolhe/abre
   });
 }
+// 12/11 (Wellington): Débitos › Já cadastrado = cliente que AINDA NÃO TEM talão.
+// - Desconto % só no Cadastrar agora (no Já cadastrado some e fica vazio, para não entrar no total).
+// - I031: cliente escolhido com talão (c[4] > 0, o mesmo da caixa de situação) → o modal encolhe:
+//   ficam cliente, celular, situação e a frase; somem os outros blocos e o Enviar. Trocou de cliente → reajusta.
+function ajustarModalTalao() {
+  if (tipo !== "divida") return;
+  const cad = modoCliente === "cadastrado";
+  const desc = $("#desc_pct");
+  if (desc) {
+    desc.closest(".desconto").classList.toggle("oculto", cad);
+    if (cad && desc.value) { desc.value = ""; somar(); }
+  }
+  const c = clienteEscolhido;
+  const temTalao = cad && !!c && c.length >= 6 && (Number(c[4]) || 0) > 0;
+  form.querySelectorAll(":scope > fieldset:not(#fs-cliente)").forEach(f => f.classList.toggle("oculto", temTalao));
+  $("#ja-talao").classList.toggle("oculto", !temTalao);
+  $("#enviar").classList.toggle("oculto", temTalao);
+  if (temTalao) mostrarAviso("");
+}
+// 12/11 (Wellington): no Débitos a COBRANÇA é própria (data | horário lado a lado, frase embaixo) — ver template acima
 $("#add").onclick = linhaProduto;
 if ($("#pg_valor")) $("#pg_valor").oninput = pagamento;
 if ($("#ant_valor")) $("#ant_valor").oninput = somar;   // 08/11: débito anterior entra no total do talão
+if ($("#desc_pct")) $("#desc_pct").oninput = somar;     // 12/11 (I032): desconto % no total
 // 08/11 (Wellington): datas do débito anterior e do recebimento só aparecem quando o valor delas é preenchido;
 // a do recebimento vem em branco (o vendedor preenche o dia em que recebeu).
 function mostrarDatasTalao() {
@@ -480,15 +1710,32 @@ function mostrarDatasTalao() {
   if ($("#caixa-rec-data")) $("#caixa-rec-data").classList.toggle("oculto", !val("pg_valor"));
 }
 // 08/11 (Wellington): voltou atrás — as 4 datas ficam sempre à mostra (a do recebimento continua vindo em branco)
-// 💬 Pergunta ao assistente (08/11)
-if (tipo !== "cliente") form.insertAdjacentHTML("beforeend", `<fieldset><legend>💬 Perguntar ao assistente</legend>
-  <textarea id="pergunta" placeholder="Ex.: quanto esse cliente comprou este mês? · quem tem cobrança vencida hoje?"></textarea>
-  <button type="button" class="perguntar" id="perguntar">Perguntar</button>
-  <div class="dica">Não grava nada. A resposta chega na conversa.</div></fieldset>`);
+// 20/11 (E14): o bloco "💬 Perguntar ao assistente" saiu; a pergunta vai pelo 📝 Recado (sem produto = só pergunta)
 linhaProduto();   // linha vazia é ignorada no envio (primeira compra do cliente novo é opcional)
 ligarBusca(); ligarCadastro(); ligarCel("c_cel"); ligarCel("v_cel"); ligarCep();
+ajustarModalTalao();   // 12/11: Débitos abre no Já cadastrado (sem Desconto %)
+// 13/11 (E2 🚚): trocar o bairro (Cliente novo) refaz o frete e o total
+if ($("#c_bairro")) $("#c_bairro").addEventListener("change", somar);
+if ($("#c_bairro_novo")) $("#c_bairro_novo").addEventListener("input", somar);
+if ($("#frete_val")) $("#frete_val").addEventListener("input", somar);   // 18/11 (E10): total soma a cada tecla
+
+// 12/11 (Wellington): data/horário/escolha sem valor ficam cinza (classe "vazio"); com valor, cor normal
+function marcarVazios() {
+  document.querySelectorAll('input[type=date], input[type=time], select').forEach(el => el.classList.toggle("vazio", !el.value));
+}
+document.addEventListener("input", marcarVazios); document.addEventListener("change", marcarVazios);
+new MutationObserver(marcarVazios).observe(document.body, { childList: true, subtree: true });
+marcarVazios();
 
 // ---------- texto enviado ao bot ----------
+// 12/11 (I032): só com desconto; sem desconto o texto fica igual a antes
+// 13/11 (E2 🚚): com 🚚 Entregador entra "Frete (Região): R$ X" depois do Desconto (Subtotal → Desconto → Frete → Total)
+const linhasDesconto = () => [
+  ...(descValor() || freteValor() ? [`Subtotal: ${reais(subtotalVenda())}`] : []),
+  ...(descValor() ? [`Desconto: ${pctTxt()} (− ${reais(descValor())})`] : []),
+  ...(freteValor() ? [freteRot()] : []),
+  // 18/11 (E10): frete digitado na hora (bairro sem frete) → o bot passa --frete (e --salvar-frete se marcado)
+  ...(freteNaHora() && freteValor() ? [`Frete na hora: ${salvarFreteBairro() ? "salvar como frete do bairro" : "só esta venda"}`] : [])];
 function montarTexto() {
   // Total + pago na hora + cobrança: iguais na Venda nova e na 1ª compra do Cliente novo (08/11)
   const fechamento = () => {
@@ -497,7 +1744,14 @@ function montarTexto() {
     const pago = pg > 0 ? [`Pago na hora: ${reais(pg)} (${val("pg_forma")})`] : ["Pago na hora: não"];
     const cob = quitou ? ["Cobrança: não tem (venda quitada)"]
       : [`${pg > 0 ? `Restante ${reais(t - pg)} · data` : "Data"} de cobrança: ${br(val("cobranca"))}`, ...linhaHoraCobranca()];
-    return [`Total: ${reais(t)}`, "", ...pago, ...cob];
+    // 13/11 (E2 🚚): Eu entrego = nenhuma linha nova; 🚚 Entregador = "Entrega: 🚚 Entregador" + linha do Frete
+    // 17/11 (E2): entregador escolhido na Venda nova → "Entregador: Nome (ENT-NN)" logo abaixo
+    // 18/11 (E9): 💾 Salvar direto = "Entrega: 💾 Salvar direto (…)" (sem card)
+    // 21/11 (E16): 🙋 Eu entrego também manda a linha ("Entrega: 🙋 Eu entrego"): a venda sempre diz como vai a entrega
+    const eg = comEntregador() ? ENTREGADORES.find(g => g[0] === ENT_ESC) : null;
+    return [...(MODO_ENTREGA === "balcao" ? ["Entrega: 💾 Salvar direto (cliente levou na hora, sem card na 🚚 Entregas)"] : []),
+      ...(MODO_ENTREGA === "vendedor" ? ["Entrega: 🙋 Eu entrego"] : []),
+      ...(comEntregador() ? ["Entrega: 🚚 Entregador", ...(eg ? [`Entregador: ${eg[1]} (${eg[0]})`] : [])] : []), ...linhasDesconto(), `Total: ${reais(t)}`, "", ...pago, ...cob];
   };
   if (tipo === "venda") {
     return ["🛒 FORMULÁRIO VENDA NOVA", "", `Cliente: ${nomeCliente()}`, ...(clienteEscolhido ? [linhaCel()] : []), `Data da venda: ${br(val("data"))}`,
@@ -513,9 +1767,9 @@ function montarTexto() {
   const cli = modoCliente === "novo" ? ["CLIENTE NOVO (cadastrar antes)", ...linhasCadastro()]
     : [`Cliente: ${nomeCliente()}`, ...(clienteEscolhido ? [linhaCel()] : [])];
   return ["📒 FORMULÁRIO DÉBITOS ANTERIORES", "", ...cli, "", "COBRANÇA", "",
-    `Data de saida: ${br(val("data")) || "//"}`, "Produtos:", ...linhas, "",
+    `Data de saida: ${br(val("ant_data")) || "//"}`, "Produtos:", ...linhas, "",   // 12/11: data única = Data débito anterior
     `Débito anterior: ${ant} data: ${br(val("ant_data")) || "//"}`, "",
-    `Total do talão: ${reais(t)}`,
+    ...linhasDesconto(), `Total do talão: ${reais(t)}`,
     pg > 0 ? `Recebido: ${reais(pg)} (${val("pg_forma")}) em ${br(val("rec_data"))}` : "Recebido: não",
     ...(quitou ? ["Cobrança: não tem (talão quitado)"]
       : [`${pg > 0 ? `Restante ${reais(t - pg)} · data` : "Data"} de cobrança: ${br(val("cobranca"))}`, ...linhaHoraCobranca()]),
@@ -524,18 +1778,10 @@ function montarTexto() {
 
 // Celular (08/11): trava no formulário, igual à regra do motor (DDD + número = 10 ou 11 dígitos; +55 aceito)
 // Celular = DDD + 9 + 8 dígitos (11); fixo de empresa (WhatsApp Business) = DDD + 8 dígitos (10). +55 aceito.
-function erroCel(id) {
-  let d = val(id).replace(/\D/g, "");
-  if (!d) return "";   // celular é opcional
-  if (d.length > 11 && d.startsWith("55")) d = d.slice(2);
-  if (d.length === 8 || d.length === 9) return "Celular sem DDD: coloque o DDD antes, ex.: (11) 98586-7941.";
-  if (d.length === 11 && d[2] !== "9") return "Celular com 11 números precisa ter o 9 depois do DDD, ex.: (11) 98586-7941.";
-  if (d.length !== 10 && d.length !== 11) return "Número com quantidade errada: DDD + número (celular 11 dígitos, fixo 10).";
-  return "";
-}
+function erroCel(id) { return erroNumeroCel(val(id)); }   // 13/11: a regra mora em erroNumeroCel (global)
 let CEL_ERRO = "";
 function celularRuim(id = "c_cel") { CEL_ERRO = erroCel(id); return !!CEL_ERRO; }
-// Ao sair do campo: vermelho + mensagem se estiver errado; certo = arruma a máscara (11) 98586-7941
+// Ao sair do campo: vermelho + mensagem se estiver errado; certo = arruma a máscara (00) 00000-0000
 const ehSemDDD = e => e.startsWith("Celular sem DDD");
 function pintarCel(id, saindo) {
   const inp = $("#" + id), campo = $("#" + id + "_campo"), caixa = $("#" + id + "_caixa"), msg = $("#" + id + "_msg");
@@ -562,7 +1808,7 @@ function ligarCel(id) {
   inp.addEventListener("input", () => pintarCel(id, false));
 }
 
-const digitosCel = v => { let d = String(v || "").replace(/\D/g, ""); if (d.length > 11 && d.startsWith("55")) d = d.slice(2); return d; };
+const digitosCel = digitosNumero;   // 13/11: mesma regra da 🗺️ Cobranças
 function formatarCel(v) {
   const d = digitosCel(v);
   if (d.length === 11) return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`;
@@ -603,7 +1849,80 @@ function ligarCep() {
   const inp = $("#c_cep");
   if (!inp) return;
   inp.addEventListener("blur", () => pintarCep(true));
-  inp.addEventListener("input", () => pintarCep(false));
+  inp.addEventListener("input", () => { pintarCep(false); buscarCep(); });
+}
+// I034 (13/11): CEP com 8 números → consulta o ViaCEP (só o CEP sai do celular). Preenche "Rua, " no Endereço
+// com o cursor no fim (falta o número), dica com bairro/cidade e sugere a região se bater com a lista.
+// Não acha / sem internet: aviso discreto, não trava o envio. Endereço já digitado: pergunta antes de trocar.
+// O texto enviado ao bot não muda (Endereço, CEP, Bairro continuam vindo dos campos).
+let cepConsultado = "";
+function regiaoDoCep(bairro) {
+  const n = sem(bairro).trim();
+  if (!n || !BAIRROS.length) return "";
+  const exato = BAIRROS.find(r => sem(r).trim() === n);
+  if (exato) return exato;
+  const perto = BAIRROS.filter(r => { const m = sem(r).trim(); return m && (m.includes(n) || n.includes(m)); });
+  return perto.length === 1 ? perto[0] : "";   // nunca cria região: sem certeza, o vendedor escolhe
+}
+function mostrarDica(id, html) { const el = $("#" + id); if (!el) return; el.innerHTML = html; el.classList.toggle("oculto", !html); if ($("#frete_dica")) somar(); }
+// 19/11 (E11): dica + botão "Usar endereço do CEP?" ficam embaixo do CEP; se o teclado cobrir, a tela sobe até ele
+function verAcimaDoTeclado(el) {
+  const subir = () => {
+    if (!el || !el.isConnected) return;
+    const falta = el.getBoundingClientRect().bottom - (alturaVisivel() - 12);
+    if (falta > 0) window.scrollBy({ top: falta, behavior: "smooth" });
+  };
+  [0, 350, 800].forEach(ms => setTimeout(subir, ms));   // espera o teclado abrir
+}
+function buscarCep() {
+  const d = val("c_cep").replace(/\D/g, "");
+  if (d.length !== 8) { cepConsultado = ""; mostrarDica("c_cep_dica", ""); mostrarDica("c_end_dica", ""); return; }
+  if (d === cepConsultado) return;
+  cepConsultado = d;
+  mostrarDica("c_cep_dica", "");
+  const naoAchou = () => { if (cepConsultado === d) mostrarDica("c_cep_dica", "CEP não encontrado, preencha à mão."); };
+  const ctl = window.AbortController ? new AbortController() : null;
+  const tempo = setTimeout(() => ctl && ctl.abort(), 6000);
+  fetch(`https://viacep.com.br/ws/${d}/json/`, ctl ? { signal: ctl.signal } : {})
+    .then(r => r.ok ? r.json() : Promise.reject())
+    .then(c => {
+      clearTimeout(tempo);
+      if (cepConsultado !== d) return;           // o vendedor já trocou o CEP
+      if (!c || c.erro) return naoAchou();
+      const cidade = [c.localidade, c.uf].filter(Boolean).join("/");
+      const dica = esc([c.bairro, cidade].filter(Boolean).join(" · ")) + " (pelo CEP)";
+      // 13/11 (ajuste): Bairro sempre preenchido. Bate com a lista = seleciona; não bate = "Outros (escrever)"
+      // com o bairro do CEP (a prévia mostra "(novo)"). Bairro já escolhido pelo vendedor = só com a pergunta.
+      const reg = regiaoDoCep(c.bairro);
+      const sel = $("#c_bairro"), novo = $("#c_bairro_novo");
+      const semLista = !sel || sel.classList.contains("oculto");   // sem regiões: só o campo de escrever
+      const bairroLivre = semLista ? !val("c_bairro_novo") : (!sel.value || (sel.value === OUTRO && !val("c_bairro_novo")));
+      const bairroIgual = !c.bairro || (reg ? sel && sel.value === reg
+        : sem(val("c_bairro_novo")) === sem(c.bairro) && (semLista || sel.value === OUTRO));
+      const usarBairro = () => {
+        if (!c.bairro) return;
+        if (reg && !semLista) { sel.value = reg; novo.classList.add("oculto"); return; }
+        if (!semLista) sel.value = OUTRO;
+        novo.value = c.bairro; novo.classList.remove("oculto");
+      };
+      if (!c.logradouro) { if (bairroLivre) usarBairro(); mostrarDica("c_cep_dica", dica); return; }   // CEP geral: só a dica (como antes)
+      const rua = c.logradouro + ", ", end = $("#c_end");
+      const usarEnd = () => {
+        end.value = rua; end.focus();
+        try { end.setSelectionRange(rua.length, rua.length); } catch (e) {}
+      };
+      const endLivre = !val("c_end");
+      if (bairroLivre) usarBairro();
+      if (endLivre) usarEnd();
+      const conflito = (!endLivre && val("c_end") !== rua.trim() && val("c_end") !== rua) || (!bairroLivre && !bairroIgual);
+      if (!conflito) { mostrarDica("c_cep_dica", dica); return; }
+      // a mesma pergunta vale para os dois campos (Endereço e Bairro)
+      const oque = [!endLivre && esc(c.logradouro), !bairroLivre && !bairroIgual && esc(reg || c.bairro)].filter(Boolean).join(" · ");
+      mostrarDica("c_cep_dica", `${dica}<br><button type="button" class="cep-usar" id="cep_usar">Usar endereço do CEP? ${oque}</button>`);
+      $("#cep_usar").onclick = () => { usarBairro(); usarEnd(); mostrarDica("c_cep_dica", dica); };
+      verAcimaDoTeclado($("#cep_usar"));
+    })
+    .catch(() => { clearTimeout(tempo); naoAchou(); });
 }
 
 // 08/11 (Wellington): só fica verde com celular completo (DDD + 9 números). Fixo (DDD + 8) passa sem trava,
@@ -633,6 +1952,8 @@ function mostrarSituacao(c) {
 }
 
 function conferirPagamento() {
+  if (!descOk()) return "Desconto precisa ser de 0,01% a 99,99% (ou deixe em branco).";
+  if (freteErro()) return freteErro();   // 18/11 (E10): só trava com o campo do frete vazio (ou inválido)
   const t = totalVenda(), pg = num(val("pg_valor"));
   if (val("pg_valor") && pg <= 0) return "Valor pago inválido.";
   if (pg > t + 0.005) return tipo === "divida" ? "Recebido maior que o total do talão." : "Pago maior que o total da venda.";
@@ -673,6 +1994,54 @@ function conferir() {
   return "";
 }
 
+// 12/11 (Wellington): ao enviar com erro, o campo do erro ganha borda vermelha, a tela rola até ele e põe o foco.
+// As frases e as travas não mudam: aqui só se acha o campo de cada frase. Celular/CEP já pintam sozinhos (só rola).
+const campoProd = l => l && (l.querySelector("[data-k=busca], [data-k=nome]"));
+function camposDoErro(e) {
+  if (!e) return { marcar: [], ir: null };
+  const um = id => $("#" + id) ? [$("#" + id)] : [];
+  const cli = () => (tipo === "cliente" || (tipo === "divida" && modoCliente === "novo")) ? um("c_nome") : um("busca");
+  const linhas = [...document.querySelectorAll("#produtos .linha")];
+  let m = [];
+  if (/^(Escolha o cliente|Falta o cliente|Falta o nome do cliente)/.test(e)) m = cli();
+  else if (e === CEL_ERRO && CEL_ERRO) {
+    const id = tipo === "venda" || (tipo === "divida" && modoCliente !== "novo") ? "v_cel" : "c_cel";
+    return { marcar: [], ir: $("#" + id) };
+  }
+  else if (e.startsWith("CEP precisa")) return { marcar: [], ir: $("#c_cep") };
+  else if (e.startsWith("Toque no produto")) { const p = produtos().find(p => !p.nome && p.busca); m = p ? [campoProd(p.el)] : []; }
+  else if (e.startsWith("Coloque pelo menos um produto")) {
+    const l = linhas.find(l => !produtos().some(p => p.el === l && p.nome)) || linhas[0];
+    m = l ? [campoProd(l)] : um("add");
+  }
+  else if (e.startsWith("Coloque algum valor")) m = [...um("ant_valor"), linhas[0] && linhas[0].querySelector("[data-k=valor]")];
+  else if (e.startsWith("Falta a data da venda")) m = um("data");
+  else if (e.startsWith("Escolha a forma")) m = um("pg_forma");
+  else if (/^(Coloque o valor pago|Valor pago inválido|Pago maior|Recebido maior)/.test(e)) m = um("pg_valor");
+  else if (e.startsWith("Falta a data do recebimento")) m = um("rec_data");
+  else if (/falta a data da cobrança|Falta a data da cobrança/.test(e)) m = um("cobranca");
+  else if (e.startsWith("Desconto precisa")) m = um("desc_pct");
+  else if (e === FRETE_ERRO || e === FRETE_INV) m = um("frete_val");   // 18/11 (E10): o campo do frete
+  m = m.filter(Boolean);
+  return { marcar: m, ir: m[0] || null };
+}
+function marcarErro(e) {
+  document.querySelectorAll(".erro-campo").forEach(x => x.classList.remove("erro-campo"));
+  const { marcar, ir } = camposDoErro(e);
+  marcar.forEach(x => x.classList.add("erro-campo"));
+  if (!ir) return;
+  ir.scrollIntoView({ behavior: "smooth", block: "center" });
+  try { ir.focus({ preventScroll: true }); } catch (_) { ir.focus(); }
+}
+// Corrigiu → a borda some (confere de novo; se o erro daquele campo saiu, tira a borda)
+function rever() {
+  const marcados = [...document.querySelectorAll(".erro-campo")];
+  if (!marcados.length) return;
+  const agora = camposDoErro(conferir()).marcar;
+  marcados.forEach(x => { if (!agora.includes(x)) x.classList.remove("erro-campo"); });
+}
+["input", "change", "click"].forEach(ev => document.addEventListener(ev, () => setTimeout(rever, 0)));
+
 // 08/11: o aviso de erro fica no topo da parte visível da tela (acima do teclado, se estiver aberto) e some ao corrigir
 let avisoTimer;
 function mostrarAviso(t) {
@@ -691,20 +2060,57 @@ function entregar(texto) {
 }
 $("#enviar").onclick = () => {
   const nadaLancado = !produtos().some(p => p.nome || p.busca) && !val("ant_valor") && !val("pg_valor");
-  if ($("#pergunta") && val("pergunta") && nadaLancado) { perguntar(); return; }
   const erro = conferir();
   mostrarAviso(erro);
+  marcarErro(erro);   // 12/11: borda vermelha + rola até o campo
   if (erro) return;
   entregar(montarTexto());
 };
+// 18/11 (E9): Venda nova e Cliente novo com compra = 3 botões [💾 Salvar direto] [🙋 Eu entrego] [🛵 Motoboy entrega].
+// Cada toque já salva (direto no bot, sem "sim"): os botões somem e fica "⏳ processando…".
+// Cliente novo só com cadastro continua com o Enviar de hoje.
+function botoesSalvar() {
+  const s = $("#salvar3"); if (!s) return;
+  const tres = tipo === "venda" || (tipo === "cliente" && temCompra());
+  s.classList.toggle("oculto", !tres); $("#enviar").classList.toggle("oculto", tres);
+}
+function salvarComo(modo) {
+  const nadaLancado = !produtos().some(p => p.nome || p.busca) && !val("ant_valor") && !val("pg_valor");
+  if (tipo === "venda" && val("obs") && nadaLancado) { perguntar(); return; }   // 20/11 (E14): 📝 sem produto = pergunta
+  MODO_ENTREGA = modo; if (modo !== "entregador") ENT_ESC = "";
+  somar();   // 🛵 soma o frete da região no total; 💾 / 🙋 sem frete
+  const erro = conferir();
+  mostrarAviso(erro); marcarErro(erro);
+  if (erro) return;
+  const salvar = () => {
+    $("#salvar3").innerHTML = `<div class="en-proc">⏳ processando…</div>`;
+    const texto = montarTexto();
+    if (salvarFreteBairro()) guardarFrete(regiaoEntrega(), freteValor());   // 18/11 (E10): a próxima venda já vem com ele
+    entregar(texto);
+  };
+  if (modo !== "entregador") { salvar(); return; }
+  if (!ENTREGADORES.length) { mostrarAviso("Nenhum entregador cadastrado: use + Entregador na 🚚 Entregas."); return; }
+  abrirListaEnt(salvar, () => { MODO_ENTREGA = "vendedor"; ENT_ESC = ""; somar(); });   // ✕ = não salva, tira o frete
+}
+if (tipo === "venda" || tipo === "cliente") {
+  form.insertAdjacentHTML("afterend", `<div class="salvar3 pg-op tres oculto" id="salvar3">
+    <button type="button" id="sv_direto">💾 Salvar direto</button>
+    <button type="button" id="sv_eu">🙋 Eu entrego</button>
+    <button type="button" id="sv_moto">🛵 Motoboy entrega</button></div>`);
+  $("#sv_direto").onclick = () => salvarComo("balcao");
+  $("#sv_eu").onclick = () => salvarComo("vendedor");
+  $("#sv_moto").onclick = () => salvarComo("entregador");
+  botoesSalvar();
+}
 // 08/11 (Wellington): basta o cliente escolhido (os dados dele já aparecem); sem cliente, bloqueia.
+// 20/11 (E14): a pergunta vem do 📝 Recado (Venda nova sem produto); texto ao bot igual ao de antes
 function perguntar() {
   if (!clienteEscolhido) { mostrarAviso("Escolha o cliente para perguntar."); return; }
-  const p = val("pergunta");
+  const p = val("obs");
   if (!p) { mostrarAviso("Escreva a pergunta."); return; }
+  $("#salvar3").innerHTML = `<div class="en-proc">⏳ processando…</div>`;
   entregar(["💬 PERGUNTA AO ASSISTENTE", "", `Cliente: ${clienteEscolhido[1]} (${clienteEscolhido[0]})`, `Pergunta: ${p}`].join("\n"));
 }
-if ($("#perguntar")) $("#perguntar").onclick = perguntar;
 
 if (tg) { tg.ready(); tg.expand(); }
 }
